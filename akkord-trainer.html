@@ -20,6 +20,8 @@
   --dot-ink: #ffffff;
   --good: #2f7d4f;
   --good-soft: #dcefe3;
+  --bad: #b3261e;
+  --bad-soft: #f9e1de;
   --f-display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
   --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
@@ -27,11 +29,11 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #121820; --panel: #1b232d; --ink: #e8edf1; --muted: #93a1ae; --line: #2e3a47;
   --brass: #e0ad55; --brass-soft: #3a2f1c; --dot: #e8edf1; --dot-ink: #121820;
-  --good: #6fcf97; --good-soft: #1d3527; color-scheme: dark } }
+  --good: #6fcf97; --good-soft: #1d3527; --bad: #f28b82; --bad-soft: #3b2220; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #121820; --panel: #1b232d; --ink: #e8edf1; --muted: #93a1ae; --line: #2e3a47;
   --brass: #e0ad55; --brass-soft: #3a2f1c; --dot: #e8edf1; --dot-ink: #121820;
-  --good: #6fcf97; --good-soft: #1d3527; color-scheme: dark }
+  --good: #6fcf97; --good-soft: #1d3527; --bad: #f28b82; --bad-soft: #3b2220; color-scheme: dark }
 
 html, body { height: 100%; }
 body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5;
@@ -47,12 +49,14 @@ h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.35rem; margin
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; min-width: 0; }
 .chord-card { display: grid; justify-items: center; gap: 4px; position: relative; transition: background .3s, border-color .3s; }
 .chord-card.hit { background: var(--good-soft); border-color: var(--good); }
+.chord-card.miss { background: var(--bad-soft); border-color: var(--bad); }
 .chord-name { font-family: var(--f-display); font-weight: 700; font-size: clamp(3.4rem, 10vw, 5rem); line-height: 1; letter-spacing: -0.03em; }
 .chord-long { color: var(--muted); font-size: 1rem; }
 #diagram { width: 100%; max-width: 280px; height: auto; margin-top: 8px; }
 .notes { font-family: var(--f-mono); font-size: .85rem; color: var(--muted); letter-spacing: .04em; }
 .badge { position: absolute; top: 14px; right: 14px; font-family: var(--f-display); font-weight: 700; color: var(--good); opacity: 0; transition: opacity .2s; }
-.chord-card.hit .badge { opacity: 1; }
+.badge.bad { color: var(--bad); }
+.chord-card.hit .badge.ok, .chord-card.miss .badge.bad { opacity: 1; }
 
 .side { display: grid; gap: 16px; align-content: start; }
 .tip { margin: 0; font-size: 1rem; }
@@ -114,7 +118,8 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
 
   <section class="stage">
     <div class="card chord-card" id="chordCard" aria-live="polite">
-      <span class="badge">Sauber!</span>
+      <span class="badge ok">Sauber!</span>
+      <span class="badge bad">Nochmal</span>
       <div class="chord-name" id="chordName">Em</div>
       <div class="chord-long" id="chordLong">E-Moll</div>
       <svg id="diagram" viewBox="0 0 240 300" role="img" aria-label="Griffbild"></svg>
@@ -205,11 +210,91 @@ const OPEN_MIDI = [40, 45, 50, 55, 59, 64];          // E2 A2 D3 G3 H3 E4
 const STRING_NAMES = ["E","A","D","G","H","e"];
 const PC_NAMES = ["C","Cis","D","Dis","E","F","Fis","G","Gis","A","B","H"];
 
+// ---------- Erkennung ----------
+// Nach jedem Anschlag wird ein Tonhöhen-Profil (12 Halbtöne) gesammelt und mit dem erwarteten Profil jedes Griffs verglichen.
+// Geprüft mit selftest.html: synthetische Akkorde, falsche Griffe, Verstimmung, Rauschen.
+const FFT = 16384, F_LO = 70, F_HI = 1800;
+const OK_SCORE = 0.84, OK_MARGIN = 0.03; // Selbsttest: richtige Griffe ≥ 0,886 und ≥ 0,022 vor dem nächsten Akkord
+const MIN_LEVEL = 0.0003; // etwa −70 dBFS; sonst zählt der gemessene Raumpegel (Handy-Mikrofone liefern ohne Verstärkung sehr leise)
+const tuneWeight = d => Math.max(0, 1 - (d / 0.45) ** 2); // d = Abstand zum nächsten Halbton, 0 … 0,5
+const pcOf = r => ((r % 12) + 12) % 12;
+
 CHORDS.forEach(c => {
   c.midi = c.frets.map((f, i) => f < 0 ? null : OPEN_MIDI[i] + f).filter(m => m !== null);
   c.pcs = [...new Set(c.midi.map(m => m % 12))];
-  c.tpl = Array.from({length: 12}, (_, i) => c.pcs.includes(i) ? 1 : 0);
+  // Erwartetes Profil mit Obertönen: eine Saite klingt auch Oktave, Quinte, Terz … höher mit
+  c.tpl = new Float32Array(12);
+  for (const m of c.midi) for (let h = 1; h <= 10; h++) {
+    const f = 440 * 2 ** ((m - 69) / 12) * h, x = m + 12 * Math.log2(h), r = Math.round(x);
+    if (f >= F_LO && f <= F_HI) c.tpl[pcOf(r)] += tuneWeight(Math.abs(x - r)) / Math.sqrt(h);
+  }
+  c.tpl = c.tpl.map(Math.sqrt);
 });
+
+// Spitzen im Spektrum (dB) in ein Histogramm mit 10-Cent-Schritten über eine Oktave eintragen
+function addPeaks(hist, db, binHz) {
+  const lo = Math.max(2, Math.ceil(F_LO / binHz)), hi = Math.min(db.length - 2, Math.floor(F_HI / binHz));
+  let top = -Infinity;
+  for (let i = lo; i <= hi; i++) if (db[i] > top) top = db[i];
+  if (!isFinite(top)) return;
+  for (let i = lo; i <= hi; i++) {
+    const a = db[i - 1], b = db[i], c = db[i + 1];
+    if (b < top - 40 || b <= a || b < c) continue;
+    const den = a - 2 * b + c, p = isFinite(den) && den < 0 ? 0.5 * (a - c) / den : 0;
+    const midi = 69 + 12 * Math.log2((i + p) * binHz / 440);
+    hist[Math.floor((((midi % 12) + 12) % 12) * 10) % 120] += 10 ** ((b - 0.25 * (a - c) * p) / 40); // Wurzel der Amplitude
+  }
+}
+
+// Pearson-Korrelation: vergleicht die Form der Profile, nicht ihre Grundhöhe (so zählen die Unterschiede zwischen E, Em und E7)
+function correlation(a, b) {
+  let ma = 0, mb = 0;
+  for (let i = 0; i < 12; i++) { ma += a[i] / 12; mb += b[i] / 12; }
+  let d = 0, na = 0, nb = 0;
+  for (let i = 0; i < 12; i++) { const x = a[i] - ma, y = b[i] - mb; d += x * y; na += x * x; nb += y * y; }
+  return d / (Math.sqrt(na * nb) || 1);
+}
+
+function chromaOf(hist) {
+  // Gesamtverstimmung schätzen, damit eine etwas verstimmte Gitarre trotzdem passt
+  let sx = 0, sy = 0;
+  for (let k = 0; k < 120; k++) { const a = Math.PI * (k + 0.5) / 5; sx += hist[k] * Math.cos(a); sy += hist[k] * Math.sin(a); }
+  const off = Math.atan2(sy, sx) / (2 * Math.PI), ch = new Float32Array(12);
+  for (let k = 0; k < 120; k++) { const x = (k + 0.5) / 10 - off, r = Math.round(x); ch[pcOf(r)] += hist[k] * tuneWeight(Math.abs(x - r)); }
+  return { ch: ch.map(Math.sqrt), off };
+}
+
+function judge(hist, target) {
+  const { ch, off } = chromaOf(hist);
+  const score = correlation(ch, target.tpl);
+  let best = target, bestScore = -1;
+  for (const c of CHORDS) if (c !== target) { const s = correlation(ch, c.tpl); if (s > bestScore) { bestScore = s; best = c; } }
+  return { ok: score >= OK_SCORE && score >= bestScore - OK_MARGIN, score, best, bestScore, off };
+}
+
+// Erkennt einen Anschlag und sammelt danach 0,2 … 0,75 s lang Spektren. Liefert dann das Histogramm.
+function createListener() {
+  let noise = 0, env = 0, phase = "idle", t0 = 0, until = 0, lastGood = 0, hist = null;
+  return {
+    reset(t) { phase = "cool"; until = t + 300; },
+    feed(t, time, freq, binHz) {
+      let s = 0;
+      for (let i = time.length - 2048; i < time.length; i++) s += time[i] * time[i];
+      const r = Math.sqrt(s / 2048);
+      if (!noise) noise = env = Math.max(r, 1e-5);
+      noise = Math.max(1e-5, noise + (r - noise) * (r < noise ? 0.2 : 0.003));
+      const onset = r > Math.max(MIN_LEVEL, noise * 4) && r > env * 1.8;
+      env += (r - env) * 0.15;
+      if (phase === "cool" && t >= until) phase = "idle";
+      if (phase === "idle" && onset) { phase = "collect"; t0 = lastGood = t; hist = new Float32Array(120); }
+      if (phase !== "collect") return { level: r };
+      if (t - t0 >= 200 && r > Math.max(MIN_LEVEL, noise * 2)) { addPeaks(hist, freq, binHz); lastGood = t; }
+      if (t - t0 < 750) return { level: r, listening: true };
+      phase = "cool"; until = t + 250;
+      return lastGood - t0 >= 350 ? { level: r, result: hist } : { level: r, ignored: true }; // Klopfen klingt nicht so lange
+    }
+  };
+}
 
 // ---------- Zustand ----------
 const store = {
@@ -287,13 +372,18 @@ function renderChips() {
   });
 }
 
+function flash(cls) {
+  const el = $("chordCard");
+  el.classList.remove("hit", "miss"); void el.offsetWidth; el.classList.add(cls);
+  clearTimeout(flash.timer); flash.timer = setTimeout(() => el.classList.remove(cls), 900);
+}
 function next(success) {
   if (advancing) return;
   if (success) {
     done++;
     advancing = true;
-    $("chordCard").classList.add("hit");
-    setTimeout(() => { $("chordCard").classList.remove("hit"); advancing = false; step(); }, 900);
+    flash("hit");
+    setTimeout(() => { advancing = false; step(); }, 900);
   } else step();
 }
 function step() {
@@ -306,11 +396,11 @@ function step() {
 let ctx = null;
 function setAudioSession(type) { try { if (navigator.audioSession) navigator.audioSession.type = type; } catch {} }
 function audio() {
-  if (!ctx) { setAudioSession("playback"); ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+  if (!ctx) { if (!stream) setAudioSession("playback"); ctx = new (window.AudioContext || window.webkitAudioContext)(); }
   if (ctx.state !== "running") ctx.resume().catch(() => {});
   return ctx;
 }
-function pluck(ac, freq, when) {
+function pluck(ac, freq, when, out = ac.destination) {
   const dur = 2.2, sr = ac.sampleRate, buf = ac.createBuffer(1, Math.floor(sr * dur), sr), d = buf.getChannelData(0);
   const N = Math.round(sr / freq), ring = new Float32Array(N);
   for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
@@ -320,7 +410,7 @@ function pluck(ac, freq, when) {
   }
   const src = ac.createBufferSource(), g = ac.createGain();
   src.buffer = buf; g.gain.value = 0.22;
-  src.connect(g).connect(ac.destination); src.start(when);
+  src.connect(g).connect(out); src.start(when);
 }
 function playChord(c) {
   const ac = audio(), t = ac.currentTime + 0.05;
@@ -328,7 +418,7 @@ function playChord(c) {
 }
 
 // ---------- Modi ----------
-let timerStart = 0, raf = 0, running = false, pausedAt = 0;
+let timerStart = 0, running = false, pausedAt = 0;
 function setMeter(frac, good) {
   const w = Math.max(0, Math.min(1, frac)) * 100 + "%";
   for (const id of ["meter", "cardMeter"]) {
@@ -336,7 +426,7 @@ function setMeter(frac, good) {
     $(id).classList.toggle("good", !!good);
   }
 }
-function resetRound() { timerStart = performance.now(); pausedAt = timerStart; holdMs = 0; setMeter(0); }
+function resetRound() { timerStart = performance.now(); pausedAt = timerStart; setMeter(0); if (listener) listener.reset(timerStart); }
 
 function setRunning(on) {
   if (on && !running && mode === "timer") timerStart += performance.now() - pausedAt;
@@ -363,10 +453,9 @@ function setMode(m) {
 }
 
 // ---------- Mikrofon-Erkennung ----------
-let stream = null, analyser = null, freqData = null, timeData = null, chroma = new Float32Array(12), holdMs = 0, lastT = 0;
+let stream = null, analyser = null, freqData = null, timeData = null, listener = null, silentSince = 0;
 async function startMic() {
   $("status").textContent = "Mikrofon wird gestartet …";
-  const ac = audio(); // noch innerhalb des Tipps starten, sonst bleibt der Ton auf iPhone/iPad stumm
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("no-mic");
     setAudioSession("play-and-record");
@@ -379,11 +468,15 @@ async function startMic() {
     return;
   }
   if (mode !== "mic" || !running) { stopMic(); return; }
-  const srcNode = ac.createMediaStreamSource(stream);
-  analyser = ac.createAnalyser(); analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0.5;
-  srcNode.connect(analyser);
-  freqData = new Float32Array(analyser.frequencyBinCount); timeData = new Float32Array(analyser.fftSize);
-  $("status").textContent = "Ich höre zu. Schlag den Akkord an und lass ihn klingen.";
+  // Frischer AudioContext erst nach dem Mikrofon-Start: ein vorher (für „Anhören“) erstellter bleibt auf iPhone/iPad oft stumm
+  if (ctx) { ctx.close().catch(() => {}); ctx = null; }
+  const ac = audio(), src = ac.createMediaStreamSource(stream), mute = ac.createGain();
+  analyser = ac.createAnalyser(); analyser.fftSize = FFT; analyser.smoothingTimeConstant = 0;
+  mute.gain.value = 0;
+  src.connect(analyser); analyser.connect(mute).connect(ac.destination); // stumm an den Ausgang, damit Safari den Zweig sicher berechnet
+  freqData = new Float32Array(FFT / 2); timeData = new Float32Array(FFT);
+  listener = createListener(); silentSince = 0;
+  $("status").textContent = "Ich höre zu. Schlag den Akkord kräftig an und lass ihn klingen.";
 }
 function stopMic() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); setAudioSession("playback"); }
@@ -399,49 +492,37 @@ async function keepAwake() {
   } } catch { wakeLock = null; }
 }
 
-function analyse(dt) {
+function listen(t) {
   analyser.getFloatTimeDomainData(timeData);
-  let rms = 0; for (const v of timeData) rms += v * v; rms = Math.sqrt(rms / timeData.length);
   analyser.getFloatFrequencyData(freqData);
-  const binHz = audio().sampleRate / analyser.fftSize, cur = new Float32Array(12);
-  for (let i = Math.floor(75 / binHz); i < Math.min(freqData.length, 1400 / binHz); i++) {
-    const midi = 69 + 12 * Math.log2(i * binHz / 440), r = Math.round(midi);
-    if (Math.abs(midi - r) > 0.35) continue;
-    cur[((r % 12) + 12) % 12] += Math.pow(10, freqData[i] / 20);
-  }
-  for (let k = 0; k < 12; k++) chroma[k] = chroma[k] * 0.6 + cur[k] * 0.4;
-  if (rms < 0.008) { holdMs = Math.max(0, holdMs - dt); return { quiet: true }; }
-  const norm = Math.hypot(...chroma) || 1;
-  const scores = queue.map(c => ({ c, s: c.tpl.reduce((a, t, k) => a + t * chroma[k], 0) / norm / Math.sqrt(c.pcs.length) }));
-  // Auch nicht ausgewählte Akkorde vergleichen, damit z. B. E nicht als Em durchgeht
-  CHORDS.filter(c => !queue.includes(c)).forEach(c => scores.push({ c, s: c.tpl.reduce((a, t, k) => a + t * chroma[k], 0) / norm / Math.sqrt(c.pcs.length) }));
-  scores.sort((a, b) => b.s - a.s);
-  const target = scores.find(x => x.c === queue[pos]);
-  const ok = target.s > 0.62 && target.s >= scores[0].s - 0.025;
-  holdMs = ok ? holdMs + dt : Math.max(0, holdMs - dt * 1.5);
-  return { best: scores[0].c, target: target.s, ok };
+  const ev = listener.feed(t, timeData, freqData, ctx.sampleRate / FFT);
+  setMeter((20 * Math.log10(ev.level || 1e-9) + 60) / 50); // −60 … −10 dBFS
+  silentSince = ev.level > 0 && ctx.state === "running" ? 0 : silentSince || t;
+  if (silentSince && t - silentSince > 2000) $("status").innerHTML = "<b>Ich bekomme keinen Ton vom Mikrofon.</b> Tippe einmal auf den Bildschirm. Hilft das nicht, lade die Seite neu.";
+  else if (ev.listening) $("status").textContent = "Ich höre …";
+  else if (ev.ignored) $("status").textContent = "Zu kurz oder zu leise. Schlag den Akkord kräftig an und lass ihn klingen.";
+  else if (ev.result) verdict(judge(ev.result, queue[pos]));
 }
 
-const HOLD_NEEDED = 600;
+function verdict(r) {
+  if (r.ok) { $("status").innerHTML = `<b>${queue[pos].n} sauber erkannt!</b>`; next(true); return; }
+  flash("miss");
+  $("status").innerHTML = (r.bestScore > r.score + 0.05
+    ? `<b>Nicht ganz.</b> Klingt eher nach ${r.best.n}. Prüf, ob jeder Finger im richtigen Bund liegt.`
+    : "<b>Nicht ganz sauber.</b> Drück die Saiten direkt hinter dem Bundstäbchen fest und schlag noch mal an.")
+    + (Math.abs(r.off) > 0.25 ? " Deine Gitarre klingt außerdem verstimmt." : "");
+}
+
 function loop(t) {
-  const dt = lastT ? Math.min(100, t - lastT) : 16; lastT = t;
   if (!advancing && running) {
     if (mode === "timer") {
       const frac = (t - timerStart) / (secs * 1000);
       setMeter(frac);
       $("status").textContent = `Noch ${Math.max(0, Math.ceil(secs - (t - timerStart) / 1000))} s – dann kommt ${queue[(pos + 1) % queue.length].n}.`;
       if (frac >= 1) next(true);
-    } else if (mode === "mic" && analyser) {
-      const r = analyse(dt);
-      setMeter(holdMs / HOLD_NEEDED, r.ok);
-      if (r.quiet) $("status").textContent = "Ich höre zu. Schlag den Akkord an und lass ihn klingen.";
-      else $("status").innerHTML = r.ok
-        ? `<b>${queue[pos].n} erkannt</b> – klingen lassen …`
-        : `Ich höre eher <b>${r.best.n}</b>. Prüf die Finger und schlag noch mal an.`;
-      if (holdMs >= HOLD_NEEDED) next(true);
-    }
+    } else if (mode === "mic" && analyser) listen(t);
   }
-  raf = requestAnimationFrame(loop);
+  requestAnimationFrame(loop);
 }
 
 // ---------- Bedienung ----------
@@ -449,7 +530,10 @@ $("nextBtn").onclick = () => next(mode === "manual");
 $("playBtn").onclick = () => playChord(queue[pos]);
 $("runBtn").onclick = () => setRunning(!running);
 document.querySelectorAll(".modes button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
-document.addEventListener("pointerdown", keepAwake);
+document.addEventListener("pointerdown", () => {
+  keepAwake();
+  if (ctx && ctx.state !== "running") ctx.resume().catch(() => {}); // iOS: Audio nach Unterbrechung per Tipp wieder starten
+});
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") keepAwake();
   else if (running) setRunning(false); // beim Wegwischen pausieren

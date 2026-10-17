@@ -1,0 +1,98 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erkennungs-Test</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; }
+  table { border-collapse: collapse; }
+  td, th { padding: 2px 8px; border-bottom: 1px solid #ddd; text-align: left; font-variant-numeric: tabular-nums; }
+  .fail { color: #b3261e; font-weight: 700; }
+</style>
+<h1>Erkennungs-Test</h1>
+<p>Spielt synthetische Gitarrenakkorde durch dieselbe Erkennung wie der Trainer und prüft das Urteil.
+  Fälle mit „–“ als Erwartung werden nur angezeigt, nicht bewertet.</p>
+<p id="sum">Läuft …</p>
+<table>
+  <thead><tr><th>Fall</th><th>Ziel</th><th>erwartet</th><th>Urteil</th><th>Wert</th><th>bester anderer</th></tr></thead>
+  <tbody id="out"></tbody>
+</table>
+<iframe id="app" hidden></iframe>
+<script>
+const app = document.getElementById("app");
+app.onload = async () => {
+  const w = app.contentWindow, CHORDS = w.eval("CHORDS"), OPEN = w.eval("OPEN_MIDI"), FFT = w.eval("FFT");
+  const notesOf = (frets, detune = () => 0) => frets.flatMap((f, i) => f < 0 ? [] : [OPEN[i] + f + detune(i)]);
+  const samePcs = (a, b) => { const s = new Set(a.map(m => ((Math.round(m) % 12) + 12) % 12)); return s.size === b.pcs.length && b.pcs.every(p => s.has(p)); };
+  const cases = [];
+  for (const c of CHORDS) {
+    cases.push({ name: "richtig", target: c, notes: notesOf(c.frets), expect: true });
+    cases.push({ name: "richtig, 30 Cent zu tief", target: c, notes: notesOf(c.frets, () => -0.3), expect: true });
+    cases.push({ name: "richtig, Saiten ±15 Cent", target: c, notes: notesOf(c.frets, () => (Math.random() - 0.5) * 0.3), expect: true });
+    cases.push({ name: "richtig, leise mit Rauschen", target: c, notes: notesOf(c.frets), gain: 0.015, noise: 0.0007, expect: true });
+    cases.push({ name: "richtig, 44,1 kHz", target: c, notes: notesOf(c.frets), sr: 44100, expect: true });
+    for (const o of CHORDS) if (o !== c) cases.push({ name: "anderer Akkord: " + o.n, target: c, notes: notesOf(o.frets), expect: false });
+    c.frets.forEach((f, i) => {
+      if (f < 0) return;
+      const up = c.frets.slice(); up[i] = f + 1;
+      // Nur eine Saite daneben: wird meist, aber nicht immer erkannt (bekannte Grenze), daher nur gezählt
+      if (!samePcs(notesOf(up), c)) cases.push({ name: `Saite ${"EADGHe"[i]} einen Bund zu hoch`, target: c, notes: notesOf(up), oneOff: true });
+      if (f > 0) { const dn = c.frets.slice(); dn[i] = f - 1;
+        if (!samePcs(notesOf(dn), c)) cases.push({ name: `Saite ${"EADGHe"[i]} einen Bund zu tief`, target: c, notes: notesOf(dn), oneOff: true }); }
+      const mu = c.frets.slice(); mu[i] = -1;
+      cases.push({ name: `Saite ${"EADGHe"[i]} gedämpft`, target: c, notes: notesOf(mu), expect: undefined });
+    });
+  }
+  cases.push({ name: "nur Rauschen", target: CHORDS[0], notes: [], noise: 0.003, expect: null });
+  cases.push({ name: "Klopfen", target: CHORDS[0], notes: [], knock: true, expect: null });
+  cases.push({ name: "eine leere E-Saite", target: CHORDS[0], notes: [40], expect: undefined });
+
+  const out = document.getElementById("out"), sum = document.getElementById("sum");
+  let pass = 0, fail = 0, oneOff = 0, oneOffCaught = 0;
+  const rows = [];
+  for (const cs of cases) {
+    const hist = await play(w, FFT, cs), r = hist && w.judge(hist, cs.target);
+    const got = r ? r.ok : null;
+    const graded = cs.expect !== undefined, okCase = !graded || got === cs.expect;
+    if (graded) okCase ? pass++ : fail++;
+    if (cs.oneOff) { oneOff++; if (got === false) oneOffCaught++; }
+    rows.push({ name: cs.name, target: cs.target.n, expect: cs.expect, got, hist, score: r && +r.score.toFixed(3), best: r && r.best.n, bestScore: r && +r.bestScore.toFixed(3), off: r && +r.off.toFixed(2) });
+    const tr = out.insertRow();
+    if (!okCase) tr.className = "fail";
+    [cs.name, cs.target.n, cs.expect === undefined ? "–" : cs.expect === null ? "kein Urteil" : cs.expect ? "richtig" : "falsch",
+      got === null ? "kein Urteil" : got ? "richtig" : "falsch", r ? r.score.toFixed(3) : "", r ? `${r.best.n} ${r.bestScore.toFixed(3)}` : ""]
+      .forEach(v => tr.insertCell().textContent = v);
+    sum.textContent = `Läuft … ${pass} bestanden, ${fail} durchgefallen`;
+  }
+  sum.textContent = `Fertig: ${pass} bestanden, ${fail} durchgefallen (von ${pass + fail} bewerteten Fällen). ` +
+    `Eine Saite einen Bund daneben: ${oneOffCaught} von ${oneOff} als falsch erkannt.`;
+  window.__done = { pass, fail, oneOff, oneOffCaught, rows };
+};
+app.src = "akkord-trainer.html?t=" + Date.now(); // immer die aktuelle Fassung testen
+
+// Ein Fall: Akkord synthetisch anschlagen (wie „Anhören“), durch Hochpass wie ein Handy-Mikrofon,
+// und die Erkennung Bild für Bild (60 pro Sekunde) wie im Trainer füttern.
+async function play(w, FFT, cs) {
+  const sr = cs.sr || 48000, dur = 1.5, ac = new OfflineAudioContext(1, Math.round(sr * dur), sr);
+  const hp = ac.createBiquadFilter(), an = ac.createAnalyser(), g = ac.createGain();
+  hp.type = "highpass"; hp.frequency.value = 100;
+  an.fftSize = FFT; an.smoothingTimeConstant = 0;
+  g.gain.value = cs.gain || 0.1;
+  g.connect(hp); hp.connect(an); an.connect(ac.destination);
+  cs.notes.forEach((m, i) => w.pluck(ac, 440 * 2 ** ((m - 69) / 12), 0.4 + i * 0.015, g));
+  if (cs.noise || cs.knock) {
+    const nb = ac.createBuffer(1, ac.length, sr), d = nb.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (cs.knock ? (i > sr * 0.4 && i < sr * 0.43 ? 0.3 : 0) : cs.noise);
+    const s = ac.createBufferSource(); s.buffer = nb; s.connect(hp); s.start(0);
+  }
+  const L = w.createListener(), td = new Float32Array(FFT), fd = new Float32Array(FFT / 2);
+  let hist = null;
+  for (let t = 1 / 60; t < dur - 0.02; t += 1 / 60) ac.suspend(t).then(() => {
+    an.getFloatTimeDomainData(td); an.getFloatFrequencyData(fd);
+    const ev = L.feed(t * 1000, td, fd, sr / FFT);
+    if (ev.result && !hist) hist = ev.result.slice();
+    ac.resume();
+  });
+  await ac.startRendering();
+  return hist;
+}
+</script>
