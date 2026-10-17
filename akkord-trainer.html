@@ -1,0 +1,472 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Griffbrett-Trainer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Akkorde">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: eine Bühne – großes Griffbild links, Steuerung rechts; auf dem Handy untereinander */
+:root {
+  --bg: #eef1f3;
+  --panel: #ffffff;
+  --ink: #18222d;
+  --muted: #5d6b78;
+  --line: #cfd7de;
+  --brass: #a8741c;
+  --brass-soft: #f3e6cc;
+  --dot: #18222d;
+  --dot-ink: #ffffff;
+  --good: #2f7d4f;
+  --good-soft: #dcefe3;
+  --f-display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121820; --panel: #1b232d; --ink: #e8edf1; --muted: #93a1ae; --line: #2e3a47;
+  --brass: #e0ad55; --brass-soft: #3a2f1c; --dot: #e8edf1; --dot-ink: #121820;
+  --good: #6fcf97; --good-soft: #1d3527; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121820; --panel: #1b232d; --ink: #e8edf1; --muted: #93a1ae; --line: #2e3a47;
+  --brass: #e0ad55; --brass-soft: #3a2f1c; --dot: #e8edf1; --dot-ink: #121820;
+  --good: #6fcf97; --good-soft: #1d3527; color-scheme: dark }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 32px; }
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
+.progress { font-family: var(--f-mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+@media (max-width: 720px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; min-width: 0; }
+.chord-card { display: grid; justify-items: center; gap: 4px; position: relative; transition: background .3s, border-color .3s; }
+.chord-card.hit { background: var(--good-soft); border-color: var(--good); }
+.chord-name { font-family: var(--f-display); font-weight: 700; font-size: clamp(3.4rem, 10vw, 5rem); line-height: 1; letter-spacing: -0.03em; }
+.chord-long { color: var(--muted); font-size: 1rem; }
+#diagram { width: 100%; max-width: 280px; height: auto; margin-top: 8px; }
+.notes { font-family: var(--f-mono); font-size: .85rem; color: var(--muted); letter-spacing: .04em; }
+.badge { position: absolute; top: 14px; right: 14px; font-family: var(--f-display); font-weight: 700; color: var(--good); opacity: 0; transition: opacity .2s; }
+.chord-card.hit .badge { opacity: 1; }
+
+.side { display: grid; gap: 16px; align-content: start; }
+.tip { margin: 0; font-size: 1rem; }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 700; margin: 0 0 6px; }
+.next { display: flex; align-items: baseline; gap: 10px; }
+.next b { font-family: var(--f-display); font-size: 1.6rem; }
+
+.btns { display: flex; flex-wrap: wrap; gap: 10px; }
+button { font: inherit; font-weight: 700; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+button:hover { border-color: var(--brass); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--brass); outline-offset: 2px; }
+button.primary { background: var(--brass); border-color: var(--brass); color: var(--panel); }
+kbd { font-family: var(--f-mono); font-size: .75rem; padding: 1px 5px; border: 1px solid currentColor; border-radius: 4px; opacity: .75; }
+
+.modes { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.modes button { flex: 1; border: 0; border-radius: 0; padding: 9px 8px; font-weight: 700; font-size: .9rem; background: transparent; color: var(--muted); }
+.modes button[aria-pressed="true"] { background: var(--brass-soft); color: var(--ink); }
+
+.meter { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.meter > div { height: 100%; width: 0; background: var(--brass); transition: width .1s linear; }
+.meter.good > div { background: var(--good); }
+.status { font-size: .9rem; color: var(--muted); min-height: 1.5em; margin: 6px 0 0; }
+.status b { color: var(--ink); }
+
+.row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: .92rem; }
+select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--f-display); font-weight: 700; font-size: .95rem; padding: 4px 10px; border-radius: 999px; }
+.chip[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+.chip.current { border-color: var(--brass); background: var(--brass-soft); }
+.legend { font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+
+button { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.card-meter { width: 100%; height: 6px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 10px; }
+.card-meter > div { height: 100%; width: 0; background: var(--brass); transition: width .1s linear; }
+.card-meter.good > div { background: var(--good); }
+.btns button { flex: 1 1 auto; min-height: 48px; }
+#runBtn[hidden] { display: none !important; }
+@media (hover: none) { kbd { display: none; } }
+
+/* Handy: Tasten unten am Rand, damit man sie mit dem Daumen trifft */
+@media (max-width: 720px) {
+  body { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .btns { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; flex-wrap: nowrap;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .btns button { min-height: 56px; font-size: 1.05rem; padding: 10px 8px; }
+  .chord-card { padding: 16px 16px 14px; }
+  #diagram { max-width: 250px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Griffbrett-Trainer</h1>
+    <span class="progress" id="progress">Akkord 1 von 12 · 0 geschafft</span>
+  </header>
+
+  <section class="stage">
+    <div class="card chord-card" id="chordCard" aria-live="polite">
+      <span class="badge">Sauber!</span>
+      <div class="chord-name" id="chordName">Em</div>
+      <div class="chord-long" id="chordLong">E-Moll</div>
+      <svg id="diagram" viewBox="0 0 240 300" role="img" aria-label="Griffbild"></svg>
+      <div class="notes" id="chordNotes">Töne: E · G · H</div>
+      <div class="card-meter" id="cardMeter"><div></div></div>
+    </div>
+
+    <div class="side">
+      <div class="card" style="display:grid;gap:14px">
+        <div>
+          <p class="label">So greifst du ihn</p>
+          <p class="tip" id="tip"></p>
+        </div>
+        <div class="btns">
+          <button id="playBtn" type="button">♪ Anhören <kbd>Enter</kbd></button>
+          <button id="runBtn" type="button">Start <kbd>P</kbd></button>
+          <button id="nextBtn" class="primary" type="button">Weiter <kbd>Leertaste</kbd></button>
+        </div>
+        <div class="next"><span class="label" style="margin:0">Danach</span><b id="nextName">Am</b></div>
+      </div>
+
+      <div class="card" style="display:grid;gap:12px">
+        <p class="label" style="margin:0">Wann geht es weiter?</p>
+        <div class="modes" role="group" aria-label="Modus">
+          <button type="button" data-mode="mic" aria-pressed="false">Mikrofon</button>
+          <button type="button" data-mode="timer" aria-pressed="true">Zeit</button>
+          <button type="button" data-mode="manual" aria-pressed="false">Selbst</button>
+        </div>
+        <div>
+          <div class="meter" id="meter"><div></div></div>
+          <p class="status" id="status"></p>
+        </div>
+        <div class="row" id="timerRow">
+          <label for="secs">Zeit pro Akkord</label>
+          <select id="secs">
+            <option value="4">4 Sekunden</option>
+            <option value="6">6 Sekunden</option>
+            <option value="8" selected>8 Sekunden</option>
+            <option value="12">12 Sekunden</option>
+          </select>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="shuffle"> Zufällige Reihenfolge</label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="display:grid;gap:12px">
+    <p class="label" style="margin:0">Akkorde in der Übung (antippen zum An-/Abwählen)</p>
+    <div class="chips" id="chips"></div>
+    <div class="legend">
+      <span><b>1</b> Zeigefinger</span><span><b>2</b> Mittelfinger</span><span><b>3</b> Ringfinger</span><span><b>4</b> kleiner Finger</span>
+      <span><b>○</b> Saite leer anschlagen</span><span><b>×</b> Saite nicht anschlagen</span>
+    </div>
+  </section>
+</div>
+
+<script>
+// Saiten von tief nach hoch: E A D G H e. frets: -1 = nicht spielen, 0 = leer
+const CHORDS = [
+  { n: "Em", long: "E-Moll", frets: [0,2,2,0,0,0], fingers: [0,2,3,0,0,0],
+    tip: "Der leichteste Akkord: Mittel- und Ringfinger in den 2. Bund auf A- und D-Saite. Alle sechs Saiten anschlagen." },
+  { n: "Am", long: "A-Moll", frets: [-1,0,2,2,1,0], fingers: [0,0,2,3,1,0],
+    tip: "Wie E-Dur, nur eine Saite tiefer verschoben. Die tiefe E-Saite nicht anschlagen." },
+  { n: "E", long: "E-Dur", frets: [0,2,2,1,0,0], fingers: [0,2,3,1,0,0],
+    tip: "Wie E-Moll, plus Zeigefinger im 1. Bund auf der G-Saite. Alle Saiten klingen." },
+  { n: "A", long: "A-Dur", frets: [-1,0,2,2,2,0], fingers: [0,0,1,2,3,0],
+    tip: "Drei Finger nebeneinander im 2. Bund. Eng zusammenrücken, damit die hohe e-Saite frei klingt." },
+  { n: "D", long: "D-Dur", frets: [-1,-1,0,2,3,2], fingers: [0,0,0,1,3,2],
+    tip: "Kleines Dreieck auf den hohen Saiten. Nur die vier hohen Saiten ab D anschlagen." },
+  { n: "Dm", long: "D-Moll", frets: [-1,-1,0,2,3,1], fingers: [0,0,0,2,3,1],
+    tip: "Wie D-Dur, aber der Finger auf der hohen e-Saite rutscht in den 1. Bund. Klingt traurig." },
+  { n: "G", long: "G-Dur", frets: [3,2,0,0,0,3], fingers: [2,1,0,0,0,3],
+    tip: "Weit gespreizt: tiefe E- und hohe e-Saite im 3. Bund. Alle sechs Saiten anschlagen." },
+  { n: "C", long: "C-Dur", frets: [-1,3,2,0,1,0], fingers: [0,3,2,0,1,0],
+    tip: "Treppe von oben: Ringfinger 3. Bund, Mittelfinger 2. Bund, Zeigefinger 1. Bund. Fingerkuppen steil aufsetzen, damit G- und e-Saite klingen." },
+  { n: "E7", long: "E-Dur Septime", frets: [0,2,0,1,0,0], fingers: [0,2,0,1,0,0],
+    tip: "E-Dur ohne Ringfinger. Nur zwei Finger, alle Saiten klingen." },
+  { n: "A7", long: "A-Dur Septime", frets: [-1,0,2,0,2,0], fingers: [0,0,2,0,3,0],
+    tip: "Wie A-Dur, nur die G-Saite bleibt leer. Tiefe E-Saite nicht anschlagen." },
+  { n: "D7", long: "D-Dur Septime", frets: [-1,-1,0,2,1,2], fingers: [0,0,0,2,1,3],
+    tip: "Umgedrehtes Dreieck zu D-Dur: Zeigefinger 1. Bund auf der H-Saite. Ab D-Saite anschlagen." },
+  { n: "Fmaj7", long: "F-Dur (einfache Form)", frets: [-1,-1,3,2,1,0], fingers: [0,0,3,2,1,0],
+    tip: "Die Einsteiger-Version vom schweren F-Barré. Treppe 3-2-1 von der D- zur H-Saite, hohe e-Saite leer." }
+];
+const OPEN_MIDI = [40, 45, 50, 55, 59, 64];          // E2 A2 D3 G3 H3 E4
+const STRING_NAMES = ["E","A","D","G","H","e"];
+const PC_NAMES = ["C","Cis","D","Dis","E","F","Fis","G","Gis","A","B","H"];
+
+CHORDS.forEach(c => {
+  c.midi = c.frets.map((f, i) => f < 0 ? null : OPEN_MIDI[i] + f).filter(m => m !== null);
+  c.pcs = [...new Set(c.midi.map(m => m % 12))];
+  c.tpl = Array.from({length: 12}, (_, i) => c.pcs.includes(i) ? 1 : 0);
+});
+
+// ---------- Zustand ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("gt_" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("gt_" + k, JSON.stringify(v)); } catch {} }
+};
+let enabled = store.get("enabled", CHORDS.map(c => c.n));
+let mode = store.get("mode", "timer");
+let shuffle = store.get("shuffle", false);
+let secs = store.get("secs", 8);
+let queue = [], pos = 0, done = 0, advancing = false;
+
+const $ = id => document.getElementById(id);
+
+function buildQueue(keepCurrent) {
+  const cur = queue[pos];
+  queue = CHORDS.filter(c => enabled.includes(c.n));
+  if (!queue.length) { enabled = [CHORDS[0].n]; queue = [CHORDS[0]]; }
+  if (shuffle) {
+    for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
+  }
+  pos = keepCurrent && cur ? Math.max(0, queue.indexOf(cur)) : 0;
+}
+
+// ---------- Griffbild ----------
+function drawDiagram(c) {
+  const svg = $("diagram"), X = i => 40 + i * 32, Y0 = 60, FH = 50, FRETS = 4;
+  let s = "";
+  for (let f = 0; f <= FRETS; f++) {
+    s += `<line x1="${X(0)}" x2="${X(5)}" y1="${Y0 + f*FH}" y2="${Y0 + f*FH}" stroke="var(--muted)" stroke-width="${f === 0 ? 7 : 2}" stroke-linecap="round"/>`;
+    if (f > 0) s += `<text x="16" y="${Y0 + (f-0.5)*FH + 5}" font-size="13" fill="var(--muted)" font-family="var(--f-mono)" text-anchor="middle">${f}</text>`;
+  }
+  for (let i = 0; i < 6; i++) {
+    s += `<line x1="${X(i)}" x2="${X(i)}" y1="${Y0}" y2="${Y0 + FRETS*FH}" stroke="var(--ink)" stroke-width="${2.6 - i*0.3}"/>`;
+    const f = c.frets[i];
+    if (f < 0) s += `<text x="${X(i)}" y="44" font-size="22" text-anchor="middle" fill="var(--muted)" font-family="var(--f-body)">×</text>`;
+    else if (f === 0) s += `<circle cx="${X(i)}" cy="37" r="8" fill="none" stroke="var(--ink)" stroke-width="2.2"/>`;
+    else {
+      const cy = Y0 + (f - 0.5) * FH;
+      s += `<circle cx="${X(i)}" cy="${cy}" r="14" fill="var(--dot)"/>`;
+      s += `<text x="${X(i)}" y="${cy + 6}" font-size="16" font-weight="700" text-anchor="middle" fill="var(--dot-ink)" font-family="var(--f-body)">${c.fingers[i] || ""}</text>`;
+    }
+    s += `<text x="${X(i)}" y="${Y0 + FRETS*FH + 28}" font-size="15" text-anchor="middle" fill="${f < 0 ? "var(--line)" : "var(--muted)"}" font-family="var(--f-mono)">${STRING_NAMES[i]}</text>`;
+  }
+  svg.innerHTML = s;
+  svg.setAttribute("aria-label", `Griffbild ${c.long}: ` + c.frets.map((f, i) => `${STRING_NAMES[i]} ${f < 0 ? "nicht spielen" : f === 0 ? "leer" : "Bund " + f + ", Finger " + c.fingers[i]}`).join("; "));
+}
+
+function render() {
+  const c = queue[pos];
+  $("chordName").textContent = c.n;
+  $("chordLong").textContent = c.long;
+  $("chordNotes").textContent = "Töne: " + c.pcs.map(p => PC_NAMES[p]).join(" · ");
+  $("tip").textContent = c.tip;
+  $("nextName").textContent = queue[(pos + 1) % queue.length].n;
+  $("progress").textContent = `Akkord ${pos + 1} von ${queue.length} · ${done} geschafft`;
+  drawDiagram(c);
+  renderChips();
+}
+
+function renderChips() {
+  $("chips").innerHTML = "";
+  CHORDS.forEach(c => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip" + (queue[pos] === c ? " current" : "");
+    b.textContent = c.n; b.title = c.long;
+    b.setAttribute("aria-pressed", enabled.includes(c.n));
+    b.onclick = () => {
+      enabled = enabled.includes(c.n) ? enabled.filter(n => n !== c.n) : [...enabled, c.n];
+      if (!enabled.length) enabled = [c.n];
+      store.set("enabled", enabled);
+      buildQueue(true); render(); resetRound();
+    };
+    $("chips").appendChild(b);
+  });
+}
+
+function next(success) {
+  if (advancing) return;
+  if (success) {
+    done++;
+    advancing = true;
+    $("chordCard").classList.add("hit");
+    setTimeout(() => { $("chordCard").classList.remove("hit"); advancing = false; step(); }, 900);
+  } else step();
+}
+function step() {
+  pos++;
+  if (pos >= queue.length) { if (shuffle) buildQueue(false); pos = 0; }
+  render(); resetRound();
+}
+
+// ---------- Klang (Karplus-Strong) ----------
+let ctx = null;
+function setAudioSession(type) { try { if (navigator.audioSession) navigator.audioSession.type = type; } catch {} }
+function audio() {
+  if (!ctx) { setAudioSession("playback"); ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+  if (ctx.state !== "running") ctx.resume().catch(() => {});
+  return ctx;
+}
+function pluck(ac, freq, when) {
+  const dur = 2.2, sr = ac.sampleRate, buf = ac.createBuffer(1, Math.floor(sr * dur), sr), d = buf.getChannelData(0);
+  const N = Math.round(sr / freq), ring = new Float32Array(N);
+  for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+  for (let i = 0, k = 0; i < d.length; i++) {
+    const a = ring[k], b = ring[(k + 1) % N];
+    d[i] = a; ring[k] = 0.996 * 0.5 * (a + b); k = (k + 1) % N;
+  }
+  const src = ac.createBufferSource(), g = ac.createGain();
+  src.buffer = buf; g.gain.value = 0.22;
+  src.connect(g).connect(ac.destination); src.start(when);
+}
+function playChord(c) {
+  const ac = audio(), t = ac.currentTime + 0.05;
+  c.midi.forEach((m, i) => pluck(ac, 440 * Math.pow(2, (m - 69) / 12), t + i * 0.035));
+}
+
+// ---------- Modi ----------
+let timerStart = 0, raf = 0, running = false, pausedAt = 0;
+function setMeter(frac, good) {
+  const w = Math.max(0, Math.min(1, frac)) * 100 + "%";
+  for (const id of ["meter", "cardMeter"]) {
+    $(id).firstElementChild.style.width = w;
+    $(id).classList.toggle("good", !!good);
+  }
+}
+function resetRound() { timerStart = performance.now(); pausedAt = timerStart; holdMs = 0; setMeter(0); }
+
+function setRunning(on) {
+  if (on && !running && mode === "timer") timerStart += performance.now() - pausedAt;
+  if (!on) pausedAt = performance.now();
+  running = on;
+  $("runBtn").innerHTML = (on ? "❚❚ Pause" : "▶ Start") + " <kbd>P</kbd>";
+  if (mode === "mic") { if (on) startMic(); else { stopMic(); setMeter(0); $("status").textContent = "Tippe auf Start, dann höre ich zu."; } }
+  if (mode === "timer" && !on) $("status").textContent = "Pausiert. Tippe auf Start, sobald du die Gitarre in der Hand hast.";
+  keepAwake();
+}
+
+function setMode(m) {
+  stopMic();
+  mode = m; store.set("mode", m);
+  document.querySelectorAll(".modes button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === m));
+  $("timerRow").hidden = m !== "timer";
+  $("meter").hidden = m === "manual";
+  $("cardMeter").hidden = m === "manual";
+  $("runBtn").hidden = m === "manual";
+  resetRound();
+  running = false;
+  if (m === "manual") $("status").textContent = "Spiel den Akkord und tippe auf Weiter, wenn er sauber klingt.";
+  else setRunning(false);
+}
+
+// ---------- Mikrofon-Erkennung ----------
+let stream = null, analyser = null, freqData = null, timeData = null, chroma = new Float32Array(12), holdMs = 0, lastT = 0;
+async function startMic() {
+  $("status").textContent = "Mikrofon wird gestartet …";
+  const ac = audio(); // noch innerhalb des Tipps starten, sonst bleibt der Ton auf iPhone/iPad stumm
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("no-mic");
+    setAudioSession("play-and-record");
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (e) {
+    stream = null; running = false;
+    setAudioSession("playback");
+    $("runBtn").innerHTML = "▶ Start <kbd>P</kbd>";
+    $("status").innerHTML = "<b>Kein Mikrofon-Zugriff.</b> Auf claude.ai ist das Mikrofon immer gesperrt. Auf der GitHub-Seite: Mikrofon in den Safari-Einstellungen für diese Website erlauben. Sonst nutze „Zeit“ oder „Selbst“.";
+    return;
+  }
+  if (mode !== "mic" || !running) { stopMic(); return; }
+  const srcNode = ac.createMediaStreamSource(stream);
+  analyser = ac.createAnalyser(); analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0.5;
+  srcNode.connect(analyser);
+  freqData = new Float32Array(analyser.frequencyBinCount); timeData = new Float32Array(analyser.fftSize);
+  $("status").textContent = "Ich höre zu. Schlag den Akkord an und lass ihn klingen.";
+}
+function stopMic() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); setAudioSession("playback"); }
+  stream = null; analyser = null;
+}
+
+// Bildschirm beim Üben anlassen (wo der Browser es erlaubt)
+let wakeLock = null;
+async function keepAwake() {
+  try { if (navigator.wakeLock && !wakeLock && document.visibilityState === "visible") {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => { wakeLock = null; });
+  } } catch { wakeLock = null; }
+}
+
+function analyse(dt) {
+  analyser.getFloatTimeDomainData(timeData);
+  let rms = 0; for (const v of timeData) rms += v * v; rms = Math.sqrt(rms / timeData.length);
+  analyser.getFloatFrequencyData(freqData);
+  const binHz = audio().sampleRate / analyser.fftSize, cur = new Float32Array(12);
+  for (let i = Math.floor(75 / binHz); i < Math.min(freqData.length, 1400 / binHz); i++) {
+    const midi = 69 + 12 * Math.log2(i * binHz / 440), r = Math.round(midi);
+    if (Math.abs(midi - r) > 0.35) continue;
+    cur[((r % 12) + 12) % 12] += Math.pow(10, freqData[i] / 20);
+  }
+  for (let k = 0; k < 12; k++) chroma[k] = chroma[k] * 0.6 + cur[k] * 0.4;
+  if (rms < 0.008) { holdMs = Math.max(0, holdMs - dt); return { quiet: true }; }
+  const norm = Math.hypot(...chroma) || 1;
+  const scores = queue.map(c => ({ c, s: c.tpl.reduce((a, t, k) => a + t * chroma[k], 0) / norm / Math.sqrt(c.pcs.length) }));
+  // Auch nicht ausgewählte Akkorde vergleichen, damit z. B. E nicht als Em durchgeht
+  CHORDS.filter(c => !queue.includes(c)).forEach(c => scores.push({ c, s: c.tpl.reduce((a, t, k) => a + t * chroma[k], 0) / norm / Math.sqrt(c.pcs.length) }));
+  scores.sort((a, b) => b.s - a.s);
+  const target = scores.find(x => x.c === queue[pos]);
+  const ok = target.s > 0.62 && target.s >= scores[0].s - 0.025;
+  holdMs = ok ? holdMs + dt : Math.max(0, holdMs - dt * 1.5);
+  return { best: scores[0].c, target: target.s, ok };
+}
+
+const HOLD_NEEDED = 600;
+function loop(t) {
+  const dt = lastT ? Math.min(100, t - lastT) : 16; lastT = t;
+  if (!advancing && running) {
+    if (mode === "timer") {
+      const frac = (t - timerStart) / (secs * 1000);
+      setMeter(frac);
+      $("status").textContent = `Noch ${Math.max(0, Math.ceil(secs - (t - timerStart) / 1000))} s – dann kommt ${queue[(pos + 1) % queue.length].n}.`;
+      if (frac >= 1) next(true);
+    } else if (mode === "mic" && analyser) {
+      const r = analyse(dt);
+      setMeter(holdMs / HOLD_NEEDED, r.ok);
+      if (r.quiet) $("status").textContent = "Ich höre zu. Schlag den Akkord an und lass ihn klingen.";
+      else $("status").innerHTML = r.ok
+        ? `<b>${queue[pos].n} erkannt</b> – klingen lassen …`
+        : `Ich höre eher <b>${r.best.n}</b>. Prüf die Finger und schlag noch mal an.`;
+      if (holdMs >= HOLD_NEEDED) next(true);
+    }
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+// ---------- Bedienung ----------
+$("nextBtn").onclick = () => next(mode === "manual");
+$("playBtn").onclick = () => playChord(queue[pos]);
+$("runBtn").onclick = () => setRunning(!running);
+document.querySelectorAll(".modes button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+document.addEventListener("pointerdown", keepAwake);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") keepAwake();
+  else if (running) setRunning(false); // beim Wegwischen pausieren
+});
+$("secs").value = String(secs);
+$("secs").onchange = e => { secs = +e.target.value; store.set("secs", secs); resetRound(); };
+$("shuffle").checked = shuffle;
+$("shuffle").onchange = e => { shuffle = e.target.checked; store.set("shuffle", shuffle); buildQueue(false); render(); resetRound(); };
+document.addEventListener("keydown", e => {
+  if (e.target.closest("select, input")) return;
+  if (e.code === "Space") { e.preventDefault(); next(mode === "manual"); }
+  if (e.code === "Enter" && !e.target.closest("button")) { e.preventDefault(); playChord(queue[pos]); }
+  if (e.code === "KeyP" && mode !== "manual") setRunning(!running);
+});
+
+buildQueue(false);
+render();
+setMode(mode);
+requestAnimationFrame(loop);
+</script>
