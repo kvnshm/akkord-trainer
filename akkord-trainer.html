@@ -35,7 +35,6 @@
   --brass: #e0ad55; --brass-soft: #3a2f1c; --dot: #e8edf1; --dot-ink: #121820;
   --good: #6fcf97; --good-soft: #1d3527; --bad: #f28b82; --bad-soft: #3b2220; color-scheme: dark }
 
-html, body { height: 100%; }
 [hidden] { display: none !important; } /* außerhalb von claude.ai fehlt diese Grundregel sonst */
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 32px; }
@@ -96,10 +95,12 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
 .card-meter.good > div { background: var(--good); }
 .btns button { flex: 1 1 auto; min-height: 48px; }
 @media (hover: none) { kbd { display: none; } }
-.chip small { font-family: var(--f-mono); font-size: .72rem; font-weight: 500; margin-left: 6px; }
-.chip small.lo { color: var(--bad); }
-.chip small.mid { color: var(--brass); }
-.chip small.hi { color: var(--good); }
+.muted { margin: 0; color: var(--muted); }
+.best-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.best-num { font-family: var(--f-display); font-weight: 700; font-size: 2.8rem; line-height: 1; color: var(--brass); font-variant-numeric: tabular-nums; }
+.best-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0 20px; margin: 0; padding: 0; list-style: none; }
+.best-list li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.best-list b { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
 .tool { padding: 8px 14px; font-size: .92rem; }
 
 /* Stimmgerät: Dialog über allem, Zeiger zeigt ±50 Cent */
@@ -191,7 +192,7 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
             <option value="12">12 Sekunden</option>
           </select>
         </div>
-        <div class="row">
+        <div class="row" id="shuffleRow">
           <label><input type="checkbox" id="shuffle"> Zufällig, schwache Akkorde öfter</label>
         </div>
       </div>
@@ -199,12 +200,17 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
   </section>
 
   <section class="card" style="display:grid;gap:12px">
-    <p class="label" style="margin:0">Akkorde in der Übung (antippen zum An-/Abwählen) · % = Treffer per Mikrofon</p>
+    <p class="label" style="margin:0">Akkorde in der Übung (antippen zum An-/Abwählen)</p>
     <div class="chips" id="chips"></div>
     <div class="legend">
       <span><b>1</b> Zeigefinger</span><span><b>2</b> Mittelfinger</span><span><b>3</b> Ringfinger</span><span><b>4</b> kleiner Finger</span>
       <span><b>○</b> Saite leer anschlagen</span><span><b>×</b> Saite nicht anschlagen</span>
     </div>
+  </section>
+
+  <section class="card" style="display:grid;gap:12px">
+    <p class="label" style="margin:0">Deine Bestwerte im Akkordwechsel</p>
+    <div id="bests" style="display:grid;gap:12px"></div>
   </section>
 </div>
 
@@ -383,10 +389,10 @@ let enabled = store.get("enabled", CHORDS.map(c => c.n));
 let mode = store.get("mode", "timer");
 let shuffle = store.get("shuffle", false);
 let secs = store.get("secs", 8);
-let stats = store.get("stats", {}); // je Akkord die letzten 20 Mikrofon-Urteile als "1" (sauber) / "0"
+let stats = store.get("stats", {}); // je Akkord die letzten 20 Mikrofon-Urteile als "1" (sauber) / "0"; nur für „schwache Akkorde öfter“
 let bests = store.get("bests", {}); // Bestwert im Akkordwechsel je Paar, Wechsel pro Minute
 let queue = [], pos = 0, partner = 0, done = 0, advancing = false;
-let changeCount = 0, changeStart = 0;
+let changeCount = 0, changeStart = 0, lastPair = "";
 
 const $ = id => document.getElementById(id);
 const say = (el, html) => { if (el.innerHTML !== html) el.innerHTML = html; }; // nur bei Änderung, sonst liest ein Screenreader ständig vor
@@ -395,7 +401,6 @@ const rate = c => stats[c.n] ? [...stats[c.n]].filter(x => x === "1").length / s
 function record(c, ok) {
   stats[c.n] = ((stats[c.n] || "") + (ok ? "1" : "0")).slice(-20);
   store.set("stats", stats);
-  renderChips();
 }
 
 function buildQueue(keepCurrent) {
@@ -415,13 +420,20 @@ function buildQueue(keepCurrent) {
     }
   }
   pos = keepCurrent && cur ? Math.max(0, queue.indexOf(cur)) : 0;
-  pairUp();
+  if (mode === "change") pickPair();
 }
 
-// Partner im Akkordwechsel: der nächste andere Akkord in der Reihe
-function pairUp() {
-  partner = (pos + 1) % queue.length;
-  for (let i = 2; i <= queue.length && queue[partner] === queue[pos]; i++) partner = (pos + i) % queue.length;
+// Akkordwechsel: zwei zufällige, verschiedene Akkorde aus der Auswahl, nicht zweimal hintereinander dasselbe Paar
+function pickPair() {
+  const pool = [...new Set(queue)];
+  let a, b, tries = 0;
+  do {
+    a = pool[Math.floor(Math.random() * pool.length)];
+    const rest = pool.filter(c => c !== a);
+    b = rest.length ? rest[Math.floor(Math.random() * rest.length)] : a;
+  } while (pool.length > 2 && [a.n, b.n].sort().join("–") === lastPair && ++tries < 50);
+  pos = queue.indexOf(a); partner = queue.indexOf(b);
+  lastPair = pairKey();
 }
 const pairKey = () => [queue[pos].n, queue[partner].n].sort().join("–");
 
@@ -450,16 +462,16 @@ function drawDiagram(c) {
 }
 
 function render() {
-  const c = queue[pos], nxt = mode === "change" ? queue[partner] : queue[(pos + 1) % queue.length], best = bests[pairKey()];
+  const c = queue[pos], nxt = mode === "change" ? queue[partner] : queue[(pos + 1) % queue.length], best = mode === "change" && bests[pairKey()];
   $("chordName").textContent = c.n;
   $("chordLong").textContent = c.long;
   $("chordNotes").textContent = "Töne: " + c.pcs.map(p => PC_NAMES[p]).join(" · ");
   $("tip").textContent = c.tip;
   $("nextLabel").textContent = mode === "change" ? "Im Wechsel mit" : "Danach";
   $("nextName").textContent = nxt.n;
-  $("progress").textContent = mode === "change"
-    ? `Wechsel ${c.n} ↔ ${nxt.n} · ${best ? `Bestwert ${best} pro Minute` : "noch kein Bestwert"}`
-    : `Akkord ${pos + 1} von ${queue.length} · ${done} geschafft`;
+  $("progress").textContent = mode !== "change" ? `Akkord ${pos + 1} von ${queue.length} · ${done} geschafft`
+    : c === nxt ? "Für den Wechsel unten mindestens zwei Akkorde auswählen"
+    : `Wechsel ${c.n} ↔ ${nxt.n} · ${best ? `Bestwert ${best} pro Minute` : "noch kein Bestwert für dieses Paar"}`;
   drawDiagram(c);
   renderChips();
 }
@@ -468,16 +480,8 @@ function renderChips() {
   $("chips").innerHTML = "";
   CHORDS.forEach(c => {
     const b = document.createElement("button");
-    b.type = "button"; b.className = "chip" + (queue[pos] === c ? " current" : "");
-    const r = rate(c);
-    b.textContent = c.n;
-    b.title = c.long + (r === null ? "" : ` · ${Math.round(r * 100)} % sauber bei den letzten ${stats[c.n].length} Anschlägen`);
-    if (r !== null) {
-      const s = document.createElement("small");
-      s.className = r >= 0.8 ? "hi" : r >= 0.5 ? "mid" : "lo";
-      s.textContent = Math.round(r * 100) + " %";
-      b.append(s);
-    }
+    b.type = "button"; b.className = "chip" + (queue[pos] === c || (mode === "change" && queue[partner] === c) ? " current" : "");
+    b.textContent = c.n; b.title = c.long;
     b.setAttribute("aria-pressed", enabled.includes(c.n));
     b.onclick = () => {
       enabled = enabled.includes(c.n) ? enabled.filter(n => n !== c.n) : [...enabled, c.n];
@@ -504,9 +508,27 @@ function next(success) {
   } else step();
 }
 function step() {
-  pos++;
-  if (pos >= queue.length) { if (shuffle) buildQueue(false); pos = 0; }
-  pairUp(); render(); resetRound();
+  if (mode === "change") pickPair(); // „Weiter“ im Wechsel: neues Zufallspaar
+  else {
+    pos++;
+    if (pos >= queue.length) { if (shuffle) buildQueue(false); pos = 0; }
+  }
+  render(); resetRound();
+}
+
+// Bestwerte unten: der höchste groß, darunter alle Paare
+function renderBests() {
+  const box = $("bests"), list = Object.entries(bests).filter(([, n]) => n > 0).sort((x, y) => y[1] - x[1]);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const pair = k => k.replace("–", " ↔ ");
+  box.replaceChildren();
+  if (!list.length) return box.append(el("p", "muted", "Noch kein Bestwert. Wähle oben „Wechsel“ und spiel eine Minute lang."));
+  const top = el("div", "best-top"), text = el("div");
+  text.append(el("b", null, "Wechsel pro Minute"), el("p", "muted", `Persönlicher Bestwert, mit ${pair(list[0][0])}`));
+  top.append(el("span", "best-num", String(list[0][1])), text);
+  const ul = el("ul", "best-list");
+  for (const [k, n] of list) { const li = el("li", null, pair(k)); li.append(el("b", null, String(n))); ul.append(li); }
+  box.append(top, ul);
 }
 
 // ---------- Klang (Karplus-Strong) ----------
@@ -557,7 +579,7 @@ function setRunning(on) {
       stopMic();
       if (mode === "change") { resetRound(); render(); } else setMeter(0);
       $("status").textContent = mode === "change"
-        ? "Eine Minute lang zwischen den beiden Akkorden hin und her wechseln. Tippe auf Start und spiel den großen Akkord. Die Minute beginnt mit dem ersten sauberen Anschlag."
+        ? "Eine Minute lang zwischen den zwei zufällig gewählten Akkorden hin und her wechseln (Weiter gibt ein neues Paar). Tippe auf Start und spiel den großen Akkord. Die Minute beginnt mit dem ersten sauberen Anschlag."
         : "Tippe auf Start, dann höre ich zu.";
     }
   }
@@ -570,9 +592,11 @@ function setMode(m) {
   mode = m; store.set("mode", m);
   document.querySelectorAll(".modes button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === m));
   $("timerRow").hidden = m !== "timer";
+  $("shuffleRow").hidden = m === "change"; // im Wechsel sind die Paare ohnehin zufällig
   $("meter").hidden = m === "manual";
   $("cardMeter").hidden = m === "manual";
   $("runBtn").hidden = m === "manual";
+  if (m === "change") pickPair();
   resetRound();
   render();
   running = false;
@@ -662,12 +686,15 @@ function changeTick(t) {
   $("progress").textContent = `Noch ${Math.min(60, Math.ceil(left))} s · ${changeCount} Wechsel · ${queue[pos].n} ↔ ${queue[partner].n}`;
 }
 function finishChange() {
-  const n = changeCount, k = pairKey(), best = bests[k] || 0;
-  if (n > best) { bests[k] = n; store.set("bests", bests); }
+  const n = changeCount, k = pairKey(), best = bests[k] || 0, top = Math.max(0, ...Object.values(bests));
+  if (n > best) { bests[k] = n; store.set("bests", bests); renderBests(); }
+  pickPair(); // nächste Runde mit neuem Zufallspaar
   setRunning(false);
-  $("status").innerHTML = `<b>Zeit um: ${n} Wechsel in einer Minute.</b> `
-    + (n > best ? (best ? `Neuer Bestwert, vorher ${best}!` : "Das ist dein erster Bestwert.") : `Dein Bestwert bleibt ${best}.`)
-    + " Tippe auf Start für die nächste Runde.";
+  $("status").innerHTML = `<b>Zeit um: ${n} Wechsel mit ${k.replace("–", " ↔ ")}.</b> `
+    + (n > top ? "Neuer persönlicher Bestwert! "
+      : n > best ? (best ? `Neuer Bestwert für dieses Paar, vorher ${best}. ` : "Erster Bestwert für dieses Paar. ")
+      : best ? `Bestwert für dieses Paar: ${best}. ` : "")
+    + `Nächstes Paar: ${queue[pos].n} ↔ ${queue[partner].n}. Tippe auf Start.`;
 }
 
 // ---------- Stimmgerät: führt von der tiefen E- bis zur hohen e-Saite, jede gestimmte Saite bekommt einen Haken ----------
@@ -789,5 +816,6 @@ document.addEventListener("keydown", e => {
 buildQueue(false);
 render();
 setMode(mode);
+renderBests();
 requestAnimationFrame(loop);
 </script>

@@ -16,7 +16,7 @@
   <thead><tr><th>Fall</th><th>Ziel</th><th>erwartet</th><th>Urteil</th><th>Wert</th><th>bester anderer</th></tr></thead>
   <tbody id="out"></tbody>
 </table>
-<h2>Stimmgerät, Akkordwechsel, Trefferquote</h2>
+<h2>Stimmgerät, Akkordwechsel, Bestwerte</h2>
 <table>
   <thead><tr><th>Prüfung</th><th>Ergebnis</th><th>Details</th></tr></thead>
   <tbody id="more"></tbody>
@@ -99,9 +99,26 @@ app.onload = async () => {
   check("Gewichtung: Am (0 %) dreimal, G (50 %) zweimal, C (100 %) einmal pro Durchgang", sh.every(n => cnt(n, "Am") === 3 && cnt(n, "G") === 2 && cnt(n, "C") === 1), sh[0].join(" "));
   check("Gewichtung: in 200 Durchgängen nie derselbe Akkord direkt hintereinander", sh.every(n => n.every((x, i) => !i || x !== n[i - 1])), sh[1].join(" "));
 
+  const rp = w.eval(`(() => {
+    stats = {}; bests = {}; enabled = ["Em", "Am", "C", "G"]; shuffle = false; buildQueue(false); setMode("change");
+    const keys = [];
+    for (let k = 0; k < 300; k++) { pickPair(); keys.push(queue[pos] === queue[partner] ? "gleich" : pairKey()); }
+    const before = pairKey(); next(false); const afterNext = pairKey();
+    enabled = ["Em", "Am"]; buildQueue(true);
+    const two = []; for (let k = 0; k < 30; k++) { pickPair(); two.push(pairKey()); }
+    enabled = ["Em"]; buildQueue(true); render();
+    const one = $("progress").textContent;
+    return { keys, distinct: [...new Set(keys)].length, before, afterNext, two: [...new Set(two)], one };
+  })()`);
+  check("Wechsel: Paare zufällig, alle 6 möglichen Paare aus 4 Akkorden kommen vor", rp.distinct === 6 && !rp.keys.includes("gleich"), `${rp.distinct} verschiedene: ${[...new Set(rp.keys)].join(", ")}`);
+  check("Wechsel: nie dasselbe Paar zweimal hintereinander", rp.keys.every((k, i) => !i || k !== rp.keys[i - 1]), rp.keys.slice(0, 8).join(" · "));
+  check("Wechsel: „Weiter“ gibt ein neues Paar", rp.afterNext !== rp.before, `${rp.before} → ${rp.afterNext}`);
+  check("Wechsel: bei nur zwei Akkorden immer genau dieses Paar", rp.two.length === 1 && rp.two[0] === "Am–Em", rp.two.join(", "));
+  check("Wechsel: bei nur einem Akkord Hinweis, mindestens zwei auszuwählen", rp.one.includes("mindestens zwei"), rp.one);
+
   const ch = w.eval(`(() => {
     stats = {}; bests = {}; enabled = ["Em", "Am", "C"]; shuffle = false; buildQueue(false);
-    setMode("change"); running = true;
+    setMode("change"); renderBests(); const empty = $("bests").textContent; running = true;
     const a = queue[pos].n, b = queue[partner].n;
     verdict({ ok: true });
     const afterStart = { pos: queue[pos].n, count: changeCount, started: changeStart > 0 };
@@ -110,17 +127,25 @@ app.onload = async () => {
     verdict({ ok: false, score: 0.5, bestScore: 0.5, best: queue[pos], off: 0 });
     const afterMiss = { pos: queue[pos].n, count: changeCount, miss: $("chordCard").classList.contains("miss") };
     changeStart = performance.now() - 61000; changeTick(performance.now());
-    const chip = [...$("chips").children].find(x => x.firstChild.textContent === "Am").textContent;
-    const res = { a, b, afterStart, after, afterMiss, best: bests[[a, b].sort().join("–")], running, status: $("status").textContent, stat: stats.Em + "|" + stats.Am, chip };
+    const first = { key: [a, b].sort().join("–"), next: pairKey(), status: $("status").textContent, bests: $("bests").textContent, running };
+    const stat = stats[a] + "|" + stats[b]; // vor der zweiten Runde, die weitere Anschläge zählt
+    running = true; verdict({ ok: true }); verdict({ ok: true });
+    changeStart = performance.now() - 61000; changeTick(performance.now());
+    const second = { status: $("status").textContent, bests: $("bests").textContent };
+    const chip = [...$("chips").children].find(x => x.textContent.startsWith("Am")).textContent;
+    const res = { a, b, empty, afterStart, after, afterMiss, first, second, best: bests[first.key], stat, chip };
     setMode("timer");
     return res;
   })()`);
-  check("Wechsel: Paar ist der große und der nächste Akkord", ch.a === "Em" && ch.b === "Am", `${ch.a} ↔ ${ch.b}`);
-  check("Wechsel: erster sauberer Akkord startet die Minute, zählt aber nicht", ch.afterStart.started && ch.afterStart.count === 0 && ch.afterStart.pos === "Am", JSON.stringify(ch.afterStart));
-  check("Wechsel: jeder weitere saubere Akkord zählt und wechselt", ch.after.count === 2 && ch.after.pos === "Am", JSON.stringify(ch.after));
-  check("Wechsel: falscher Akkord zählt nicht und leuchtet rot", ch.afterMiss.count === 2 && ch.afterMiss.pos === "Am" && ch.afterMiss.miss, JSON.stringify(ch.afterMiss));
-  check("Wechsel: nach 60 s Ende, Bestwert gespeichert", ch.best === 2 && !ch.running && ch.status.includes("2 Wechsel"), ch.status);
-  check("Trefferquote: jeder Anschlag zählt, Anzeige auf der Taste", ch.stat === "11|10" && ch.chip.includes("50 %"), `${ch.stat} · Taste „${ch.chip}“`);
+  check("Wechsel: erster sauberer Akkord startet die Minute, zählt aber nicht", ch.afterStart.started && ch.afterStart.count === 0 && ch.afterStart.pos === ch.b, JSON.stringify(ch.afterStart));
+  check("Wechsel: jeder weitere saubere Akkord zählt und wechselt", ch.after.count === 2 && ch.after.pos === ch.b, JSON.stringify(ch.after));
+  check("Wechsel: falscher Akkord zählt nicht und leuchtet rot", ch.afterMiss.count === 2 && ch.afterMiss.pos === ch.b && ch.afterMiss.miss, JSON.stringify(ch.afterMiss));
+  check("Wechsel: nach 60 s Ende, Bestwert gespeichert, neues Zufallspaar", ch.best === 2 && !ch.first.running && ch.first.next !== ch.first.key
+    && ch.first.status.includes("2 Wechsel") && ch.first.status.includes("Neuer persönlicher Bestwert") && ch.first.status.includes("Nächstes Paar"), ch.first.status);
+  check("Wechsel: zweite Runde mit weniger Wechseln ist kein persönlicher Bestwert", !ch.second.status.includes("persönlicher") && ch.second.status.includes("Erster Bestwert für dieses Paar"), ch.second.status);
+  check("Bestwerte unten: leer mit Hinweis, danach Höchstwert groß und Liste aller Paare", ch.empty.startsWith("Noch kein Bestwert")
+    && ch.second.bests.startsWith("2Wechsel pro Minute") && ch.second.bests.includes(ch.first.key.replace("–", " ↔ ")), `${ch.empty} | ${ch.second.bests}`);
+  check("Trefferquote: nicht mehr sichtbar, zählt aber weiter für „schwache Akkorde öfter“", ch.chip === "Am" && ch.stat === "11|10", `Taste „${ch.chip}“ · ${ch.stat}`);
 
   // Geführtes Stimmen: Messwerte (Hz) im 50-ms-Takt einspeisen, wie sie das Stimmgerät liefert
   const tg = w.eval(`(() => {
