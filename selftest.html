@@ -122,6 +122,29 @@ app.onload = async () => {
   check("Wechsel: nach 60 s Ende, Bestwert gespeichert", ch.best === 2 && !ch.running && ch.status.includes("2 Wechsel"), ch.status);
   check("Trefferquote: jeder Anschlag zählt, Anzeige auf der Taste", ch.stat === "11|10" && ch.chip.includes("50 %"), `${ch.stat} · Taste „${ch.chip}“`);
 
+  // Geführtes Stimmen: Messwerte (Hz) im 50-ms-Takt einspeisen, wie sie das Stimmgerät liefert
+  const tg = w.eval(`(() => {
+    tuneDone = Array(6).fill(false); tuneString(0);
+    const hz = (k, c) => 440 * 2 ** ((OPEN_MIDI[k] + c / 100 - 69) / 12);
+    let t = 1000;
+    const feed = (f, ms) => { for (const end = t + ms; t < end; t += 50) tuneWith(t, f); };
+    const st = () => $("tunerStatus").textContent, r = {};
+    feed(hz(0, -20), 1500); r.low = { step: tuneStep, st: st() };
+    feed(hz(0, 0), 1000); r.pass = { step: tuneStep, st: st(), done: tuneDone.join() };
+    feed(hz(0, 0), 800); r.ring = { step: tuneStep, st: st() };
+    feed(null, 600); feed(hz(2, 0), 1000); r.wrong = { step: tuneStep, st: st() };
+    for (let k = 1; k < 6; k++) { feed(null, 1300); feed(hz(k, 2), 1000); }
+    r.all = { step: tuneStep, st: st(), done: tuneDone.join(), note: $("tunerNote").textContent, chips: $("tunerStrings").textContent };
+    tuneString(3); r.again = { step: tuneStep, done: tuneDone.join() };
+    return r;
+  })()`);
+  check("Stimmen: zu tiefe E-Saite bleibt dran und sagt „Zu tief“", tg.low.step === 0 && tg.low.st.startsWith("Zu tief"), JSON.stringify(tg.low));
+  check("Stimmen: E stimmt 0,7 s lang, dann Haken und weiter zur A-Saite", tg.pass.step === 1 && tg.pass.done.startsWith("true,false") && tg.pass.st.includes("Jetzt die A-Saite"), JSON.stringify(tg.pass));
+  check("Stimmen: nachklingende E-Saite wird ignoriert", tg.ring.step === 1 && tg.ring.st === tg.pass.st, JSON.stringify(tg.ring));
+  check("Stimmen: falsche Saite gezupft gibt Hinweis statt „Zu hoch“", tg.wrong.step === 1 && tg.wrong.st.includes("Das ist die D-Saite"), JSON.stringify(tg.wrong));
+  check("Stimmen: nach allen sechs Saiten fertig", tg.all.step === -1 && tg.all.st.startsWith("Alle sechs Saiten passen") && !tg.all.done.includes("false") && tg.all.note === "✓", JSON.stringify(tg.all));
+  check("Stimmen: Antippen einer Saite stimmt sie noch einmal", tg.again.step === 3 && tg.again.done === "true,true,true,false,true,true", JSON.stringify(tg.again));
+
   sum.textContent = `Fertig: ${pass} bestanden, ${fail} durchgefallen (von ${pass + fail} bewerteten Fällen). ` +
     `Eine Saite einen Bund daneben: ${oneOffCaught} von ${oneOff} als falsch erkannt.`;
   window.__done = { pass, fail, oneOff, oneOffCaught, rows };

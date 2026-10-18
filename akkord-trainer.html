@@ -111,8 +111,10 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .tuner-hint { margin: 0; font-size: .9rem; color: var(--muted); }
 .strings { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .strings button { min-width: 44px; min-height: 44px; padding: 6px 10px; font-family: var(--f-mono); }
-.strings button.on { background: var(--brass-soft); border-color: var(--brass); }
-.strings button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--brass); }
+.strings button { position: relative; }
+.strings button.done { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+.strings button.done::after { content: "✓"; position: absolute; top: -7px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--good); color: var(--panel); font-size: .7rem; line-height: 18px; }
+.strings button.on { background: var(--brass-soft); border-color: var(--brass); box-shadow: inset 0 0 0 2px var(--brass); }
 .tuner-note { font-family: var(--f-display); font-weight: 700; font-size: 4.5rem; line-height: 1; }
 .tuner-cents { min-height: 1.4em; font-family: var(--f-mono); font-size: .9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tuner-scale { position: relative; width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden; }
@@ -212,8 +214,8 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
       <h2 id="tunerTitle">Stimmgerät</h2>
       <button id="tunerClose" type="button">Fertig</button>
     </div>
-    <p class="tuner-hint">Zupf eine einzelne Saite. Ich erkenne sie selbst, oder du tippst sie hier an und hältst sie fest.</p>
-    <div class="strings" id="tunerStrings" role="group" aria-label="Saite festhalten"></div>
+    <p class="tuner-hint">Zupf die markierte Saite. Stimmt sie, geht es von selbst zur nächsten. Antippen springt zu einer Saite.</p>
+    <div class="strings" id="tunerStrings" role="group" aria-label="Saiten"></div>
     <div class="tuner-note" id="tunerNote">–</div>
     <div class="tuner-cents" id="tunerCents"></div>
     <div class="tuner-scale" aria-hidden="true"><div class="tuner-needle" id="tunerNeedle" hidden></div></div>
@@ -668,40 +670,69 @@ function finishChange() {
     + " Tippe auf Start für die nächste Runde.";
 }
 
-// ---------- Stimmgerät ----------
-let tuneLock = null, tuneFreqs = [], tuneLast = 0, tuneSeen = 0;
+// ---------- Stimmgerät: führt von der tiefen E- bis zur hohen e-Saite, jede gestimmte Saite bekommt einen Haken ----------
+let tuneStep = 0, tuneDone = [], tuneFreqs = [], tuneLast = 0, tuneSeen = 0, tuneOkSince = 0, tuneHold = 0;
 const tunerOpen = () => $("tuner").open; // der Dialog selbst ist die einzige Wahrheit, auch bei schnellem Schließen und Öffnen
+const stringName = k => k === 0 ? "tiefe E-Saite" : k === 5 ? "hohe e-Saite" : STRING_NAMES[k] + "-Saite";
 function tune(t) {
   if (t - tuneLast < 50) return; // 20 Messungen pro Sekunde reichen und schonen den Akku
   tuneLast = t;
   if (ctx.state !== "running") return say($("tunerStatus"), "Tippe einmal auf den Bildschirm, damit ich zuhören kann.");
   analyser.getFloatTimeDomainData(timeData);
-  const f = detectPitch(timeData, ctx.sampleRate);
+  tuneWith(t, detectPitch(timeData, ctx.sampleRate));
+}
+// Eine Messung (Hz oder null) verarbeiten: glätten, prüfen, bei 0,7 s im grünen Bereich zur nächsten Saite
+function tuneWith(t, f) {
+  if (t < tuneHold) f = null; // die eben gestimmte Saite klingt noch nach
   if (f) { tuneFreqs.push(f); if (tuneFreqs.length > 5) tuneFreqs.shift(); tuneSeen = t; }
   else if (tuneFreqs.length && t - tuneSeen > 500) tuneFreqs = []; // Saite verklungen
-  renderTuner();
-}
-function renderTuner() {
-  const f = tuneFreqs.length ? [...tuneFreqs].sort((a, b) => a - b)[tuneFreqs.length >> 1] : null; // Median glättet Ausreißer
-  const r = f && tuneTarget(f, tuneLock), shown = r ? r.string : tuneLock;
-  $("tunerStrings").querySelectorAll("button").forEach((b, k) => { b.classList.toggle("on", k === shown); b.setAttribute("aria-pressed", k === tuneLock); });
-  $("tunerNote").textContent = shown == null ? "–" : STRING_NAMES[shown];
-  $("tunerNeedle").hidden = !r;
-  if (!r) { $("tunerCents").textContent = ""; return; }
-  const ok = Math.abs(r.cents) <= 5;
-  $("tunerNeedle").style.left = 50 + Math.max(-50, Math.min(50, r.cents)) + "%";
-  $("tunerNeedle").classList.toggle("ok", ok);
-  $("tunerCents").textContent = `${r.cents > 0 ? "+" : ""}${r.cents} Cent · ${f.toFixed(1).replace(".", ",")} Hz`;
-  say($("tunerStatus"), ok ? "<b>Gestimmt.</b> Weiter mit der nächsten Saite."
+  const m = tuneFreqs.length ? [...tuneFreqs].sort((a, b) => a - b)[tuneFreqs.length >> 1] : null; // Median glättet Ausreißer
+  const r = m && tuneStep >= 0 ? tuneTarget(m, tuneStep) : null;
+  tuneOkSince = r && Math.abs(r.cents) <= 5 ? tuneOkSince || t : 0;
+  if (tuneOkSince && t - tuneOkSince >= 700) {
+    const passed = tuneStep;
+    tuneDone[passed] = true;
+    tuneStep = tuneDone.indexOf(false, passed);
+    if (tuneStep < 0) tuneStep = tuneDone.indexOf(false); // weiter mit der nächsten offenen Saite, -1 = alle gestimmt
+    tuneFreqs = []; tuneOkSince = 0; tuneHold = t + 1200;
+    renderTuner(null);
+    return say($("tunerStatus"), tuneStep < 0
+      ? "<b>Alle sechs Saiten passen.</b> Viel Spaß beim Üben! Tippe eine Saite an, um sie noch einmal zu prüfen."
+      : `<b>Die ${stringName(passed)} passt.</b> Jetzt die ${stringName(tuneStep)}.`);
+  }
+  renderTuner(r);
+  if (!r) return; // ohne Ton bleibt die letzte Meldung stehen
+  const near = tuneTarget(m, null);
+  say($("tunerStatus"), near.string !== tuneStep && Math.abs(near.cents) < 50 && Math.abs(r.cents) > 250
+    ? `Das ist die ${stringName(near.string)}. Zupf die ${stringName(tuneStep)}.`
+    : Math.abs(r.cents) <= 5 ? "<b>Passt.</b> Kurz klingen lassen …"
     : r.cents < 0 ? "<b>Zu tief.</b> Saite langsam fester spannen."
     : "<b>Zu hoch.</b> Saite etwas lockern und dann von unten wieder heranstimmen.");
 }
+function renderTuner(r) {
+  $("tunerStrings").querySelectorAll("button").forEach((b, k) => {
+    b.setAttribute("aria-label", STRING_NAMES[k] + (tuneDone[k] ? ", gestimmt" : ""));
+    b.classList.toggle("on", k === tuneStep);
+    b.classList.toggle("done", !!tuneDone[k]);
+    if (k === tuneStep) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+  });
+  $("tunerNote").textContent = tuneStep < 0 ? "✓" : STRING_NAMES[tuneStep];
+  $("tunerNeedle").hidden = !r;
+  if (!r) { $("tunerCents").textContent = ""; return; }
+  $("tunerNeedle").style.left = 50 + Math.max(-50, Math.min(50, r.cents)) + "%";
+  $("tunerNeedle").classList.toggle("ok", Math.abs(r.cents) <= 5);
+  $("tunerCents").textContent = `${r.cents > 0 ? "+" : ""}${r.cents} Cent`;
+}
+function tuneString(k) {
+  tuneStep = k; tuneDone[k] = false; tuneFreqs = []; tuneOkSince = 0; tuneHold = 0;
+  renderTuner(null);
+}
 function openTuner() {
   if (running) setRunning(false);
-  tuneFreqs = [];
-  renderTuner();
+  tuneDone = Array(6).fill(false);
+  tuneString(0);
   $("tuner").showModal();
-  startMic($("tunerStatus"), "Zupf eine einzelne Saite an und lass sie klingen.");
+  startMic($("tunerStatus"), "Zupf die tiefe E-Saite und lass sie klingen.");
   keepAwake();
 }
 
@@ -736,7 +767,7 @@ $("tuner").addEventListener("close", () => { if (!tunerOpen()) stopMic(); }); //
 STRING_NAMES.forEach((s, k) => {
   const b = document.createElement("button");
   b.type = "button"; b.textContent = s;
-  b.onclick = () => { tuneLock = tuneLock === k ? null : k; renderTuner(); };
+  b.onclick = () => { tuneString(k); say($("tunerStatus"), `Zupf die ${stringName(k)}.`); };
   $("tunerStrings").append(b);
 });
 document.addEventListener("visibilitychange", () => {
