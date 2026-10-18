@@ -36,12 +36,13 @@
   --good: #6fcf97; --good-soft: #1d3527; --bad: #f28b82; --bad-soft: #3b2220; color-scheme: dark }
 
 html, body { height: 100%; }
-body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5;
+[hidden] { display: none !important; } /* außerhalb von claude.ai fehlt diese Grundregel sonst */
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 32px; }
 .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
+header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 16px; }
 h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
-.progress { font-family: var(--f-mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.progress { grid-column: 1 / -1; font-family: var(--f-mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
 @media (max-width: 720px) { .stage { grid-template-columns: minmax(0, 1fr); } }
@@ -72,7 +73,7 @@ button.primary { background: var(--brass); border-color: var(--brass); color: va
 kbd { font-family: var(--f-mono); font-size: .75rem; padding: 1px 5px; border: 1px solid currentColor; border-radius: 4px; opacity: .75; }
 
 .modes { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.modes button { flex: 1; border: 0; border-radius: 0; padding: 9px 8px; font-weight: 700; font-size: .9rem; background: transparent; color: var(--muted); }
+.modes button { flex: 1; min-width: 0; border: 0; border-radius: 0; padding: 9px 4px; font-weight: 700; font-size: .88rem; background: transparent; color: var(--muted); }
 .modes button[aria-pressed="true"] { background: var(--brass-soft); color: var(--ink); }
 
 .meter { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; }
@@ -94,8 +95,33 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
 .card-meter > div { height: 100%; width: 0; background: var(--brass); transition: width .1s linear; }
 .card-meter.good > div { background: var(--good); }
 .btns button { flex: 1 1 auto; min-height: 48px; }
-#runBtn[hidden] { display: none !important; }
 @media (hover: none) { kbd { display: none; } }
+.chip small { font-family: var(--f-mono); font-size: .72rem; font-weight: 500; margin-left: 6px; }
+.chip small.lo { color: var(--bad); }
+.chip small.mid { color: var(--brass); }
+.chip small.hi { color: var(--good); }
+.tool { padding: 8px 14px; font-size: .92rem; }
+
+/* Stimmgerät: Dialog über allem, Zeiger zeigt ±50 Cent */
+dialog { box-sizing: border-box; width: min(440px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: var(--ink); padding: 20px; }
+dialog::backdrop { background: rgb(0 0 0 / .5); }
+.tuner { display: grid; gap: 14px; justify-items: center; text-align: center; }
+.tuner-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; }
+.tuner-head h2 { font-family: var(--f-display); font-size: 1.25rem; margin: 0; }
+.tuner-hint { margin: 0; font-size: .9rem; color: var(--muted); }
+.strings { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.strings button { min-width: 44px; min-height: 44px; padding: 6px 10px; font-family: var(--f-mono); }
+.strings button.on { background: var(--brass-soft); border-color: var(--brass); }
+.strings button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--brass); }
+.tuner-note { font-family: var(--f-display); font-weight: 700; font-size: 4.5rem; line-height: 1; }
+.tuner-cents { min-height: 1.4em; font-family: var(--f-mono); font-size: .9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tuner-scale { position: relative; width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden; }
+.tuner-scale::before { content: ""; position: absolute; top: 0; bottom: 0; left: 45%; width: 10%; background: var(--good-soft); }
+.tuner-scale::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: var(--good); }
+.tuner-needle { position: absolute; z-index: 1; top: 5px; bottom: 5px; left: 50%; width: 8px; margin-left: -4px; border-radius: 4px; background: var(--brass); transition: left .1s linear; }
+.tuner-needle.ok { background: var(--good); }
+.scale-labels { display: flex; justify-content: space-between; width: 100%; margin-top: -8px; font-size: .8rem; color: var(--muted); }
+#tunerStatus { margin: 0; min-height: 3em; }
 
 /* Handy: Tasten unten am Rand, damit man sie mit dem Daumen trifft */
 @media (max-width: 720px) {
@@ -113,6 +139,7 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
 <div class="wrap">
   <header>
     <h1>Griffbrett-Trainer</h1>
+    <button id="tunerBtn" class="tool" type="button">Stimmgerät</button>
     <span class="progress" id="progress">Akkord 1 von 12 · 0 geschafft</span>
   </header>
 
@@ -138,13 +165,14 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
           <button id="runBtn" type="button">Start <kbd>P</kbd></button>
           <button id="nextBtn" class="primary" type="button">Weiter <kbd>Leertaste</kbd></button>
         </div>
-        <div class="next"><span class="label" style="margin:0">Danach</span><b id="nextName">Am</b></div>
+        <div class="next"><span class="label" id="nextLabel" style="margin:0">Danach</span><b id="nextName">Am</b></div>
       </div>
 
       <div class="card" style="display:grid;gap:12px">
-        <p class="label" style="margin:0">Wann geht es weiter?</p>
-        <div class="modes" role="group" aria-label="Modus">
+        <p class="label" style="margin:0">So übst du</p>
+        <div class="modes" role="group" aria-label="Übungsart">
           <button type="button" data-mode="mic" aria-pressed="false">Mikrofon</button>
+          <button type="button" data-mode="change" aria-pressed="false">Wechsel</button>
           <button type="button" data-mode="timer" aria-pressed="true">Zeit</button>
           <button type="button" data-mode="manual" aria-pressed="false">Selbst</button>
         </div>
@@ -162,14 +190,14 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
           </select>
         </div>
         <div class="row">
-          <label><input type="checkbox" id="shuffle"> Zufällige Reihenfolge</label>
+          <label><input type="checkbox" id="shuffle"> Zufällig, schwache Akkorde öfter</label>
         </div>
       </div>
     </div>
   </section>
 
   <section class="card" style="display:grid;gap:12px">
-    <p class="label" style="margin:0">Akkorde in der Übung (antippen zum An-/Abwählen)</p>
+    <p class="label" style="margin:0">Akkorde in der Übung (antippen zum An-/Abwählen) · % = Treffer per Mikrofon</p>
     <div class="chips" id="chips"></div>
     <div class="legend">
       <span><b>1</b> Zeigefinger</span><span><b>2</b> Mittelfinger</span><span><b>3</b> Ringfinger</span><span><b>4</b> kleiner Finger</span>
@@ -177,6 +205,22 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
     </div>
   </section>
 </div>
+
+<dialog id="tuner" aria-labelledby="tunerTitle">
+  <div class="tuner">
+    <div class="tuner-head">
+      <h2 id="tunerTitle">Stimmgerät</h2>
+      <button id="tunerClose" type="button">Fertig</button>
+    </div>
+    <p class="tuner-hint">Zupf eine einzelne Saite. Ich erkenne sie selbst, oder du tippst sie hier an und hältst sie fest.</p>
+    <div class="strings" id="tunerStrings" role="group" aria-label="Saite festhalten"></div>
+    <div class="tuner-note" id="tunerNote">–</div>
+    <div class="tuner-cents" id="tunerCents"></div>
+    <div class="tuner-scale" aria-hidden="true"><div class="tuner-needle" id="tunerNeedle" hidden></div></div>
+    <div class="scale-labels" aria-hidden="true"><span>zu tief</span><span>stimmt</span><span>zu hoch</span></div>
+    <p class="status" id="tunerStatus" aria-live="polite"></p>
+  </div>
+</dialog>
 
 <script>
 // Saiten von tief nach hoch: E A D G H e. frets: -1 = nicht spielen, 0 = leer
@@ -214,7 +258,9 @@ const PC_NAMES = ["C","Cis","D","Dis","E","F","Fis","G","Gis","A","B","H"];
 // Nach jedem Anschlag wird ein Tonhöhen-Profil (12 Halbtöne) gesammelt und mit dem erwarteten Profil jedes Griffs verglichen.
 // Geprüft mit selftest.html: synthetische Akkorde, falsche Griffe, Verstimmung, Rauschen.
 const FFT = 16384, F_LO = 70, F_HI = 1800;
-const OK_SCORE = 0.84, OK_MARGIN = 0.03; // Selbsttest: richtige Griffe ≥ 0,886 und ≥ 0,022 vor dem nächsten Akkord
+// Selbsttest: richtige Griffe ≥ 0,89 (sehr leise mit Rauschen ≥ 0,83) und ≥ 0,037 vor dem nächstbesten Akkord;
+// der knappste falsche (E statt E7) liegt ≥ 0,034 dahinter
+const OK_SCORE = 0.82;
 const MIN_LEVEL = 0.0003; // etwa −70 dBFS; sonst zählt der gemessene Raumpegel (Handy-Mikrofone liefern ohne Verstärkung sehr leise)
 const tuneWeight = d => Math.max(0, 1 - (d / 0.45) ** 2); // d = Abstand zum nächsten Halbton, 0 … 0,5
 const pcOf = r => ((r % 12) + 12) % 12;
@@ -269,7 +315,7 @@ function judge(hist, target) {
   const score = correlation(ch, target.tpl);
   let best = target, bestScore = -1;
   for (const c of CHORDS) if (c !== target) { const s = correlation(ch, c.tpl); if (s > bestScore) { bestScore = s; best = c; } }
-  return { ok: score >= OK_SCORE && score >= bestScore - OK_MARGIN, score, best, bestScore, off };
+  return { ok: score >= OK_SCORE && score >= bestScore, score, best, bestScore, off }; // der verlangte Akkord muss am besten passen
 }
 
 // Erkennt einen Anschlag und sammelt danach 0,2 … 0,75 s lang Spektren. Liefert dann das Histogramm.
@@ -296,6 +342,36 @@ function createListener() {
   };
 }
 
+// Grundton einer einzelnen Saite fürs Stimmgerät (YIN-Verfahren): Frequenz in Hz oder null
+function detectPitch(buf, sr) {
+  const W = 2048, maxLag = Math.floor(sr / 65), minLag = Math.floor(sr / 450), s0 = buf.length - W - maxLag - 1;
+  if (s0 < 0) return null;
+  let e = 0;
+  for (let j = 0; j < W; j++) e += buf[s0 + j] * buf[s0 + j];
+  if (Math.sqrt(e / W) < MIN_LEVEL / 3) return null; // nur fast völlige Stille; Rauschen fällt unten an der fehlenden Periodizität durch
+  const d = new Float32Array(maxLag + 2), cm = new Float32Array(maxLag + 2);
+  let acc = 0;
+  for (let tau = 1; tau <= maxLag + 1; tau++) {
+    let s = 0;
+    for (let j = 0; j < W; j++) { const x = buf[s0 + j] - buf[s0 + j + tau]; s += x * x; }
+    d[tau] = s; acc += s; cm[tau] = acc ? s * tau / acc : 1; // normiert: verhindert Fehlgriffe eine Oktave zu hoch
+  }
+  let tau = minLag;
+  while (tau <= maxLag && cm[tau] >= 0.15) tau++;
+  if (tau > maxLag) return null;
+  while (tau < maxLag && cm[tau + 1] < cm[tau]) tau++;
+  const a = d[tau - 1], b = d[tau], c = d[tau + 1], den = a - 2 * b + c;
+  return sr / (tau + (den > 0 ? 0.5 * (a - c) / den : 0));
+}
+
+// Nächste Saite (oder die festgehaltene) und Abweichung in Cent
+function tuneTarget(freq, lock) {
+  const m = 69 + 12 * Math.log2(freq / 440);
+  let i = lock;
+  if (i == null) { i = 0; for (let k = 1; k < 6; k++) if (Math.abs(m - OPEN_MIDI[k]) < Math.abs(m - OPEN_MIDI[i])) i = k; }
+  return { string: i, cents: Math.round((m - OPEN_MIDI[i]) * 100) };
+}
+
 // ---------- Zustand ----------
 const store = {
   get(k, d) { try { const v = localStorage.getItem("gt_" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -305,19 +381,47 @@ let enabled = store.get("enabled", CHORDS.map(c => c.n));
 let mode = store.get("mode", "timer");
 let shuffle = store.get("shuffle", false);
 let secs = store.get("secs", 8);
-let queue = [], pos = 0, done = 0, advancing = false;
+let stats = store.get("stats", {}); // je Akkord die letzten 20 Mikrofon-Urteile als "1" (sauber) / "0"
+let bests = store.get("bests", {}); // Bestwert im Akkordwechsel je Paar, Wechsel pro Minute
+let queue = [], pos = 0, partner = 0, done = 0, advancing = false;
+let changeCount = 0, changeStart = 0;
 
 const $ = id => document.getElementById(id);
+const say = (el, html) => { if (el.innerHTML !== html) el.innerHTML = html; }; // nur bei Änderung, sonst liest ein Screenreader ständig vor
+
+const rate = c => stats[c.n] ? [...stats[c.n]].filter(x => x === "1").length / stats[c.n].length : null;
+function record(c, ok) {
+  stats[c.n] = ((stats[c.n] || "") + (ok ? "1" : "0")).slice(-20);
+  store.set("stats", stats);
+  renderChips();
+}
 
 function buildQueue(keepCurrent) {
   const cur = queue[pos];
   queue = CHORDS.filter(c => enabled.includes(c.n));
   if (!queue.length) { enabled = [CHORDS[0].n]; queue = [CHORDS[0]]; }
   if (shuffle) {
-    for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
+    // Schwache Akkorde kommen öfter: unter 50 % Treffer dreimal, unter 80 % zweimal pro Durchgang, nie zweimal direkt hintereinander
+    const rest = queue.flatMap(c => { const r = rate(c); return Array(r === null || r >= 0.8 ? 1 : r >= 0.5 ? 2 : 3).fill(c); });
+    queue = [];
+    while (rest.length) {
+      const last = queue[queue.length - 1];
+      // Ein Akkord, der mehr als die Hälfte des Rests ausmacht, muss jetzt dran, sonst bleiben am Ende nur gleiche übrig
+      const many = rest.find(c => c !== last && 2 * rest.filter(x => x === c).length > rest.length);
+      const ok = rest.map((c, i) => i).filter(i => rest[i] !== last);
+      queue.push(rest.splice(many ? rest.indexOf(many) : ok.length ? ok[Math.floor(Math.random() * ok.length)] : 0, 1)[0]);
+    }
   }
   pos = keepCurrent && cur ? Math.max(0, queue.indexOf(cur)) : 0;
+  pairUp();
 }
+
+// Partner im Akkordwechsel: der nächste andere Akkord in der Reihe
+function pairUp() {
+  partner = (pos + 1) % queue.length;
+  for (let i = 2; i <= queue.length && queue[partner] === queue[pos]; i++) partner = (pos + i) % queue.length;
+}
+const pairKey = () => [queue[pos].n, queue[partner].n].sort().join("–");
 
 // ---------- Griffbild ----------
 function drawDiagram(c) {
@@ -344,13 +448,16 @@ function drawDiagram(c) {
 }
 
 function render() {
-  const c = queue[pos];
+  const c = queue[pos], nxt = mode === "change" ? queue[partner] : queue[(pos + 1) % queue.length], best = bests[pairKey()];
   $("chordName").textContent = c.n;
   $("chordLong").textContent = c.long;
   $("chordNotes").textContent = "Töne: " + c.pcs.map(p => PC_NAMES[p]).join(" · ");
   $("tip").textContent = c.tip;
-  $("nextName").textContent = queue[(pos + 1) % queue.length].n;
-  $("progress").textContent = `Akkord ${pos + 1} von ${queue.length} · ${done} geschafft`;
+  $("nextLabel").textContent = mode === "change" ? "Im Wechsel mit" : "Danach";
+  $("nextName").textContent = nxt.n;
+  $("progress").textContent = mode === "change"
+    ? `Wechsel ${c.n} ↔ ${nxt.n} · ${best ? `Bestwert ${best} pro Minute` : "noch kein Bestwert"}`
+    : `Akkord ${pos + 1} von ${queue.length} · ${done} geschafft`;
   drawDiagram(c);
   renderChips();
 }
@@ -360,7 +467,15 @@ function renderChips() {
   CHORDS.forEach(c => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "chip" + (queue[pos] === c ? " current" : "");
-    b.textContent = c.n; b.title = c.long;
+    const r = rate(c);
+    b.textContent = c.n;
+    b.title = c.long + (r === null ? "" : ` · ${Math.round(r * 100)} % sauber bei den letzten ${stats[c.n].length} Anschlägen`);
+    if (r !== null) {
+      const s = document.createElement("small");
+      s.className = r >= 0.8 ? "hi" : r >= 0.5 ? "mid" : "lo";
+      s.textContent = Math.round(r * 100) + " %";
+      b.append(s);
+    }
     b.setAttribute("aria-pressed", enabled.includes(c.n));
     b.onclick = () => {
       enabled = enabled.includes(c.n) ? enabled.filter(n => n !== c.n) : [...enabled, c.n];
@@ -389,7 +504,7 @@ function next(success) {
 function step() {
   pos++;
   if (pos >= queue.length) { if (shuffle) buildQueue(false); pos = 0; }
-  render(); resetRound();
+  pairUp(); render(); resetRound();
 }
 
 // ---------- Klang (Karplus-Strong) ----------
@@ -426,14 +541,24 @@ function setMeter(frac, good) {
     $(id).classList.toggle("good", !!good);
   }
 }
-function resetRound() { timerStart = performance.now(); pausedAt = timerStart; setMeter(0); if (listener) listener.reset(timerStart); }
+function resetRound() { timerStart = performance.now(); pausedAt = timerStart; changeCount = 0; changeStart = 0; setMeter(0); if (listener) listener.reset(timerStart); }
 
+const usesMic = () => mode === "mic" || mode === "change";
 function setRunning(on) {
   if (on && !running && mode === "timer") timerStart += performance.now() - pausedAt;
   if (!on) pausedAt = performance.now();
   running = on;
   $("runBtn").innerHTML = (on ? "❚❚ Pause" : "▶ Start") + " <kbd>P</kbd>";
-  if (mode === "mic") { if (on) startMic(); else { stopMic(); setMeter(0); $("status").textContent = "Tippe auf Start, dann höre ich zu."; } }
+  if (usesMic()) {
+    if (on) startMic($("status"), "Ich höre zu. Schlag den Akkord kräftig an und lass ihn klingen.");
+    else {
+      stopMic();
+      if (mode === "change") { resetRound(); render(); } else setMeter(0);
+      $("status").textContent = mode === "change"
+        ? "Eine Minute lang zwischen den beiden Akkorden hin und her wechseln. Tippe auf Start und spiel den großen Akkord. Die Minute beginnt mit dem ersten sauberen Anschlag."
+        : "Tippe auf Start, dann höre ich zu.";
+    }
+  }
   if (mode === "timer" && !on) $("status").textContent = "Pausiert. Tippe auf Start, sobald du die Gitarre in der Hand hast.";
   keepAwake();
 }
@@ -447,27 +572,32 @@ function setMode(m) {
   $("cardMeter").hidden = m === "manual";
   $("runBtn").hidden = m === "manual";
   resetRound();
+  render();
   running = false;
   if (m === "manual") $("status").textContent = "Spiel den Akkord und tippe auf Weiter, wenn er sauber klingt.";
   else setRunning(false);
 }
 
-// ---------- Mikrofon-Erkennung ----------
+// ---------- Mikrofon (Akkorderkennung, Wechsel und Stimmgerät teilen es) ----------
 let stream = null, analyser = null, freqData = null, timeData = null, listener = null, silentSince = 0;
-async function startMic() {
-  $("status").textContent = "Mikrofon wird gestartet …";
+const micWanted = () => tunerOpen() || (running && usesMic());
+async function startMic(out, ready) {
+  say(out, "Mikrofon wird gestartet …");
+  let s;
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("no-mic");
     setAudioSession("play-and-record");
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
   } catch (e) {
-    stream = null; running = false;
-    setAudioSession("playback");
-    $("runBtn").innerHTML = "▶ Start <kbd>P</kbd>";
-    $("status").innerHTML = "<b>Kein Mikrofon-Zugriff.</b> Auf claude.ai ist das Mikrofon immer gesperrt. Auf der GitHub-Seite: Mikrofon in den Safari-Einstellungen für diese Website erlauben. Sonst nutze „Zeit“ oder „Selbst“.";
+    if (!stream) setAudioSession("playback");
+    if (out.id === "status" && running) setRunning(false);
+    say(out, "<b>Kein Mikrofon-Zugriff.</b> Auf claude.ai ist das Mikrofon immer gesperrt. Auf der GitHub-Seite: Mikrofon in den Safari-Einstellungen für diese Website erlauben."
+      + (out.id === "status" ? " Ohne Mikrofon gehen „Zeit“ und „Selbst“." : ""));
     return;
   }
-  if (mode !== "mic" || !running) { stopMic(); return; }
+  // Inzwischen gestoppt oder schon von einem früheren Tipp gestartet: dieses Mikrofon gleich wieder freigeben
+  if (!micWanted() || stream) { s.getTracks().forEach(t => t.stop()); if (!stream) setAudioSession("playback"); return; }
+  stream = s;
   // Frischer AudioContext erst nach dem Mikrofon-Start: ein vorher (für „Anhören“) erstellter bleibt auf iPhone/iPad oft stumm
   if (ctx) { ctx.close().catch(() => {}); ctx = null; }
   const ac = audio(), src = ac.createMediaStreamSource(stream), mute = ac.createGain();
@@ -476,7 +606,7 @@ async function startMic() {
   src.connect(analyser); analyser.connect(mute).connect(ac.destination); // stumm an den Ausgang, damit Safari den Zweig sicher berechnet
   freqData = new Float32Array(FFT / 2); timeData = new Float32Array(FFT);
   listener = createListener(); silentSince = 0;
-  $("status").textContent = "Ich höre zu. Schlag den Akkord kräftig an und lass ihn klingen.";
+  say(out, ready);
 }
 function stopMic() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); setAudioSession("playback"); }
@@ -505,6 +635,8 @@ function listen(t) {
 }
 
 function verdict(r) {
+  record(queue[pos], r.ok);
+  if (r.ok && mode === "change") return changeHit();
   if (r.ok) { $("status").innerHTML = `<b>${queue[pos].n} sauber erkannt!</b>`; next(true); return; }
   flash("miss");
   $("status").innerHTML = (r.bestScore > r.score + 0.05
@@ -513,14 +645,78 @@ function verdict(r) {
     + (Math.abs(r.off) > 0.25 ? " Deine Gitarre klingt außerdem verstimmt." : "");
 }
 
+// ---------- Akkordwechsel: eine Minute zwischen zwei Akkorden hin und her ----------
+function changeHit() {
+  if (changeStart) changeCount++; else changeStart = performance.now(); // die Minute startet mit dem ersten sauberen Akkord
+  flash("hit");
+  [pos, partner] = [partner, pos];
+  render();
+  $("status").innerHTML = changeCount ? `<b>${changeCount}. Wechsel!</b> Jetzt ${queue[pos].n}.` : `<b>Die Minute läuft.</b> Jetzt wechseln zu ${queue[pos].n}.`;
+}
+function changeTick(t) {
+  if (!changeStart) return;
+  const left = 60 - (t - changeStart) / 1000;
+  if (left <= 0) return finishChange();
+  $("progress").textContent = `Noch ${Math.min(60, Math.ceil(left))} s · ${changeCount} Wechsel · ${queue[pos].n} ↔ ${queue[partner].n}`;
+}
+function finishChange() {
+  const n = changeCount, k = pairKey(), best = bests[k] || 0;
+  if (n > best) { bests[k] = n; store.set("bests", bests); }
+  setRunning(false);
+  $("status").innerHTML = `<b>Zeit um: ${n} Wechsel in einer Minute.</b> `
+    + (n > best ? (best ? `Neuer Bestwert, vorher ${best}!` : "Das ist dein erster Bestwert.") : `Dein Bestwert bleibt ${best}.`)
+    + " Tippe auf Start für die nächste Runde.";
+}
+
+// ---------- Stimmgerät ----------
+let tuneLock = null, tuneFreqs = [], tuneLast = 0, tuneSeen = 0;
+const tunerOpen = () => $("tuner").open; // der Dialog selbst ist die einzige Wahrheit, auch bei schnellem Schließen und Öffnen
+function tune(t) {
+  if (t - tuneLast < 50) return; // 20 Messungen pro Sekunde reichen und schonen den Akku
+  tuneLast = t;
+  if (ctx.state !== "running") return say($("tunerStatus"), "Tippe einmal auf den Bildschirm, damit ich zuhören kann.");
+  analyser.getFloatTimeDomainData(timeData);
+  const f = detectPitch(timeData, ctx.sampleRate);
+  if (f) { tuneFreqs.push(f); if (tuneFreqs.length > 5) tuneFreqs.shift(); tuneSeen = t; }
+  else if (tuneFreqs.length && t - tuneSeen > 500) tuneFreqs = []; // Saite verklungen
+  renderTuner();
+}
+function renderTuner() {
+  const f = tuneFreqs.length ? [...tuneFreqs].sort((a, b) => a - b)[tuneFreqs.length >> 1] : null; // Median glättet Ausreißer
+  const r = f && tuneTarget(f, tuneLock), shown = r ? r.string : tuneLock;
+  $("tunerStrings").querySelectorAll("button").forEach((b, k) => { b.classList.toggle("on", k === shown); b.setAttribute("aria-pressed", k === tuneLock); });
+  $("tunerNote").textContent = shown == null ? "–" : STRING_NAMES[shown];
+  $("tunerNeedle").hidden = !r;
+  if (!r) { $("tunerCents").textContent = ""; return; }
+  const ok = Math.abs(r.cents) <= 5;
+  $("tunerNeedle").style.left = 50 + Math.max(-50, Math.min(50, r.cents)) + "%";
+  $("tunerNeedle").classList.toggle("ok", ok);
+  $("tunerCents").textContent = `${r.cents > 0 ? "+" : ""}${r.cents} Cent · ${f.toFixed(1).replace(".", ",")} Hz`;
+  say($("tunerStatus"), ok ? "<b>Gestimmt.</b> Weiter mit der nächsten Saite."
+    : r.cents < 0 ? "<b>Zu tief.</b> Saite langsam fester spannen."
+    : "<b>Zu hoch.</b> Saite etwas lockern und dann von unten wieder heranstimmen.");
+}
+function openTuner() {
+  if (running) setRunning(false);
+  tuneFreqs = [];
+  renderTuner();
+  $("tuner").showModal();
+  startMic($("tunerStatus"), "Zupf eine einzelne Saite an und lass sie klingen.");
+  keepAwake();
+}
+
 function loop(t) {
-  if (!advancing && running) {
+  if (tunerOpen()) { if (analyser) tune(t); }
+  else if (!advancing && running) {
     if (mode === "timer") {
       const frac = (t - timerStart) / (secs * 1000);
       setMeter(frac);
       $("status").textContent = `Noch ${Math.max(0, Math.ceil(secs - (t - timerStart) / 1000))} s – dann kommt ${queue[(pos + 1) % queue.length].n}.`;
       if (frac >= 1) next(true);
-    } else if (mode === "mic" && analyser) listen(t);
+    } else if (usesMic() && analyser) {
+      listen(t);
+      if (mode === "change" && running) changeTick(t);
+    }
   }
   requestAnimationFrame(loop);
 }
@@ -534,16 +730,26 @@ document.addEventListener("pointerdown", () => {
   keepAwake();
   if (ctx && ctx.state !== "running") ctx.resume().catch(() => {}); // iOS: Audio nach Unterbrechung per Tipp wieder starten
 });
+$("tunerBtn").onclick = openTuner;
+$("tunerClose").onclick = () => $("tuner").close();
+$("tuner").addEventListener("close", () => { if (!tunerOpen()) stopMic(); }); // auch bei Escape; verspätet nach Wiederöffnen: nichts tun
+STRING_NAMES.forEach((s, k) => {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = s;
+  b.onclick = () => { tuneLock = tuneLock === k ? null : k; renderTuner(); };
+  $("tunerStrings").append(b);
+});
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") keepAwake();
-  else if (running) setRunning(false); // beim Wegwischen pausieren
+  else if (tunerOpen()) $("tuner").close(); // beim Wegwischen Mikrofon freigeben
+  else if (running) setRunning(false);
 });
 $("secs").value = String(secs);
 $("secs").onchange = e => { secs = +e.target.value; store.set("secs", secs); resetRound(); };
 $("shuffle").checked = shuffle;
 $("shuffle").onchange = e => { shuffle = e.target.checked; store.set("shuffle", shuffle); buildQueue(false); render(); resetRound(); };
 document.addEventListener("keydown", e => {
-  if (e.target.closest("select, input")) return;
+  if (tunerOpen() || e.target.closest("select, input")) return;
   if (e.code === "Space") { e.preventDefault(); next(mode === "manual"); }
   if (e.code === "Enter" && !e.target.closest("button")) { e.preventDefault(); playChord(queue[pos]); }
   if (e.code === "KeyP" && mode !== "manual") setRunning(!running);
