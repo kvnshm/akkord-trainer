@@ -39,7 +39,9 @@
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 32px; }
 .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 16px; }
+header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 16px; }
+.tools { display: flex; gap: 8px; }
+@media (max-width: 480px) { header { grid-template-columns: minmax(0, 1fr); } }
 h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
 .progress { grid-column: 1 / -1; font-family: var(--f-mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -126,6 +128,32 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .scale-labels { display: flex; justify-content: space-between; width: 100%; margin-top: -8px; font-size: .8rem; color: var(--muted); }
 #tunerStatus { margin: 0; min-height: 3em; }
 
+/* Songs: aktueller Akkord, Anschlagmuster in Achteln, Ablauf Takt für Takt */
+.song { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.song > * { min-width: 0; }
+.song .row select { flex: 1; min-width: 0; max-width: 100%; }
+.song .row #songTempo { flex: 0 0 auto; }
+.song .label { margin: 0 0 6px; }
+.song-now { display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.song-chord { font-family: var(--f-display); font-weight: 700; font-size: 3.4rem; line-height: 1; }
+#songNext { margin-top: 4px; font-variant-numeric: tabular-nums; }
+#songDiagram { width: 100%; height: auto; }
+.pattern { display: grid; grid-template-columns: repeat(var(--slots, 8), minmax(0, 1fr)); gap: 4px; }
+.pattern div { display: grid; justify-items: center; padding: 6px 0 4px; border-radius: 8px; background: var(--bg); transition: background .08s; }
+.pattern b { font-size: 1.45rem; line-height: 1.1; color: var(--brass); }
+.pattern span { font-family: var(--f-mono); font-size: .75rem; color: var(--muted); }
+.pattern div.on { background: var(--brass); }
+.pattern div.on b, .pattern div.on span { color: var(--panel); }
+.chart { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; max-height: 28vh; overflow-y: auto; }
+.chart div { display: flex; justify-content: space-around; padding: 6px 2px; border: 1px solid var(--line); border-radius: 8px; font-family: var(--f-display); font-weight: 700; font-size: .95rem; }
+.chart div.now { border-color: var(--brass); background: var(--brass-soft); }
+.chart .hit { color: var(--good); }
+.chart .miss { color: var(--bad); }
+.chart .quiet { color: var(--muted); text-decoration: line-through; }
+.song-btns { display: flex; gap: 10px; }
+.song-btns button { flex: 1; min-height: 52px; }
+#songStatus { margin: 0; min-height: 3em; }
+
 /* Handy: Tasten unten am Rand, damit man sie mit dem Daumen trifft */
 @media (max-width: 720px) {
   body { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
@@ -142,7 +170,10 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 <div class="wrap">
   <header>
     <h1>Griffbrett-Trainer</h1>
-    <button id="tunerBtn" class="tool" type="button">Stimmgerät</button>
+    <div class="tools">
+      <button id="songsBtn" class="tool" type="button">Songs</button>
+      <button id="tunerBtn" class="tool" type="button">Stimmgerät</button>
+    </div>
     <span class="progress" id="progress">Akkord 1 von 12 · 0 geschafft</span>
   </header>
 
@@ -230,6 +261,32 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
   </div>
 </dialog>
 
+<dialog id="songs" aria-labelledby="songsTitle">
+  <div class="song">
+    <div class="tuner-head">
+      <h2 id="songsTitle">Songs</h2>
+      <button id="songsClose" type="button">Fertig</button>
+    </div>
+    <div class="row"><label for="songSel">Song</label><select id="songSel"></select></div>
+    <div class="row">
+      <label for="songTempo">Tempo</label>
+      <select id="songTempo"><option value="0.7">langsam</option><option value="0.85">mittel</option><option value="1">normal</option></select>
+      <span class="muted" id="songBpm"></span>
+    </div>
+    <div class="song-now" id="songNow">
+      <div><div class="song-chord" id="songChord">–</div><div class="muted" id="songNext"></div></div>
+      <svg id="songDiagram" viewBox="0 0 240 300" role="img" aria-label="Griffbild"></svg>
+    </div>
+    <div><p class="label">Anschlag pro Takt: ↓ ab, ↑ auf</p><div class="pattern" id="songPattern"></div></div>
+    <div><p class="label">Ablauf, ein Kästchen pro Takt</p><div class="chart" id="songChart"></div></div>
+    <p class="status" id="songStatus" aria-live="polite"></p>
+    <div class="song-btns">
+      <button id="songPlay" class="primary" type="button">▶ Mitspielen</button>
+      <button id="songDemo" type="button">♪ Vorspielen</button>
+    </div>
+  </div>
+</dialog>
+
 <script>
 // Saiten von tief nach hoch: E A D G H e. frets: -1 = nicht spielen, 0 = leer
 const CHORDS = [
@@ -266,7 +323,7 @@ const PC_NAMES = ["C","Cis","D","Dis","E","F","Fis","G","Gis","A","B","H"];
 // Nach jedem Anschlag wird ein Tonhöhen-Profil (12 Halbtöne) gesammelt und mit dem erwarteten Profil jedes Griffs verglichen.
 // Geprüft mit selftest.html: synthetische Akkorde, falsche Griffe, Verstimmung, Rauschen.
 const FFT = 16384, F_LO = 70, F_HI = 1800;
-// Selbsttest: richtige Griffe ≥ 0,89 (sehr leise mit Rauschen ≥ 0,83) und ≥ 0,037 vor dem nächstbesten Akkord;
+// Selbsttest: richtige Griffe ≥ 0,89 (leise mit Rauschen ebenfalls darüber, nur kaum über dem Rauschen vereinzelt bis 0,79) und ≥ 0,037 vor dem nächstbesten Akkord;
 // der knappste falsche (E statt E7) liegt ≥ 0,034 dahinter
 const OK_SCORE = 0.82;
 const MIN_LEVEL = 0.0003; // etwa −70 dBFS; sonst zählt der gemessene Raumpegel (Handy-Mikrofone liefern ohne Verstärkung sehr leise)
@@ -438,8 +495,8 @@ function pickPair() {
 const pairKey = () => [queue[pos].n, queue[partner].n].sort().join("–");
 
 // ---------- Griffbild ----------
-function drawDiagram(c) {
-  const svg = $("diagram"), X = i => 40 + i * 32, Y0 = 60, FH = 50, FRETS = 4;
+function drawDiagram(c, svg = $("diagram")) {
+  const X = i => 40 + i * 32, Y0 = 60, FH = 50, FRETS = 4;
   let s = "";
   for (let f = 0; f <= FRETS; f++) {
     s += `<line x1="${X(0)}" x2="${X(5)}" y1="${Y0 + f*FH}" y2="${Y0 + f*FH}" stroke="var(--muted)" stroke-width="${f === 0 ? 7 : 2}" stroke-linecap="round"/>`;
@@ -539,17 +596,44 @@ function audio() {
   if (ctx.state !== "running") ctx.resume().catch(() => {});
   return ctx;
 }
-function pluck(ac, freq, when, out = ac.destination) {
-  const dur = 2.2, sr = ac.sampleRate, buf = ac.createBuffer(1, Math.floor(sr * dur), sr), d = buf.getChannelData(0);
+function ksBuffer(ac, freq, dur) {
+  const sr = ac.sampleRate, buf = ac.createBuffer(1, Math.floor(sr * dur), sr), d = buf.getChannelData(0);
   const N = Math.round(sr / freq), ring = new Float32Array(N);
   for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
   for (let i = 0, k = 0; i < d.length; i++) {
     const a = ring[k], b = ring[(k + 1) % N];
     d[i] = a; ring[k] = 0.996 * 0.5 * (a + b); k = (k + 1) % N;
   }
+  return buf;
+}
+function pluck(ac, freq, when, out = ac.destination) {
   const src = ac.createBufferSource(), g = ac.createGain();
-  src.buffer = buf; g.gain.value = 0.22;
+  src.buffer = ksBuffer(ac, freq, 2.2); g.gain.value = 0.22;
   src.connect(g).connect(out); src.start(when);
+}
+// Ein Anschlag: ab = alle Saiten tief nach hoch, auf = die drei hohen Saiten zurück. Töne werden einmal berechnet und wiederverwendet.
+const ksCache = new Map();
+function strum(ac, c, when, up, out = ac.destination) {
+  const notes = up ? c.midi.slice(-3).reverse() : c.midi;
+  return notes.map((m, i) => {
+    const key = ac.sampleRate + ":" + m;
+    if (!ksCache.has(key)) ksCache.set(key, ksBuffer(ac, 440 * 2 ** ((m - 69) / 12), 1.6));
+    const src = ac.createBufferSource(), g = ac.createGain();
+    src.buffer = ksCache.get(key); g.gain.value = up ? 0.12 : 0.18;
+    src.connect(g).connect(out); src.start(when + i * 0.012);
+    return g;
+  });
+}
+// Metronom-Klick: Rauschen über 2,5 kHz, damit er die Akkorderkennung (bis 1,8 kHz) nicht stört
+let tickBuf = null;
+function tick(ac, when, accent, out = ac.destination) {
+  if (!tickBuf || tickBuf.sampleRate !== ac.sampleRate) {
+    const n = Math.floor(ac.sampleRate * 0.03), d = (tickBuf = ac.createBuffer(1, n, ac.sampleRate)).getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-6 * i / n);
+  }
+  const src = ac.createBufferSource(), hp = ac.createBiquadFilter(), g = ac.createGain();
+  src.buffer = tickBuf; hp.type = "highpass"; hp.frequency.value = 2500; g.gain.value = accent ? 0.9 : 0.45;
+  src.connect(hp).connect(g).connect(out); src.start(when);
 }
 function playChord(c) {
   const ac = audio(), t = ac.currentTime + 0.05;
@@ -606,7 +690,7 @@ function setMode(m) {
 
 // ---------- Mikrofon (Akkorderkennung, Wechsel und Stimmgerät teilen es) ----------
 let stream = null, analyser = null, freqData = null, timeData = null, listener = null, silentSince = 0;
-const micWanted = () => tunerOpen() || (running && usesMic());
+const micWanted = () => tunerOpen() || !!(song && song.mic) || (running && usesMic());
 async function startMic(out, ready) {
   say(out, "Mikrofon wird gestartet …");
   let s;
@@ -763,8 +847,177 @@ function openTuner() {
   keepAwake();
 }
 
+// ---------- Songs: Akkorde im Takt, mit Einzählen, Metronom, Anschlagmuster und Prüfung pro Akkord ----------
+// chart: Takte durch | getrennt, zwei Akkorde in einem Takt teilen sich die Schläge. pattern: Achtel, D = ab, U = auf, - = Pause.
+// Nur Titel und vereinfachte Akkordfolgen (F als Fmaj7), keine Liedtexte oder Melodien.
+const SONGS = [
+  { t: "Erste Schritte", a: "Übung", bpm: 60, beats: 4, pattern: "D-D-D-D-", chart: "Em | Em | Am | Am", repeat: 3 },
+  { t: "Knockin' on Heaven's Door", a: "Bob Dylan", bpm: 68, beats: 4, pattern: "D-DU-UDU", chart: "G D | Am | G D | C", repeat: 4 },
+  { t: "Zombie", a: "The Cranberries", bpm: 84, beats: 4, pattern: "D-DU-UDU", chart: "Em | C | G | D", repeat: 4 },
+  { t: "Riptide", a: "Vance Joy", bpm: 100, beats: 4, pattern: "D-DU-UDU", chart: "Am | G | C | C", repeat: 4 },
+  { t: "Let It Be", a: "The Beatles", bpm: 72, beats: 4, pattern: "D-D-DUDU", chart: "C G | Am Fmaj7 | C G | Fmaj7 C", repeat: 4 },
+  { t: "Country Roads", a: "John Denver", bpm: 82, beats: 4, pattern: "D-DU-UDU", chart: "G | D | Em | C | G | D | C | G", repeat: 2 },
+  { t: "Bad Moon Rising", a: "Creedence Clearwater Revival", bpm: 90, beats: 4, pattern: "D-DU-UDU", chart: "D | A G | D | D | G | G | D | D | A | G | D | D", repeat: 2 },
+  { t: "House of the Rising Sun", a: "Traditional", bpm: 100, beats: 3, pattern: "D-DUDU", chart: "Am | C | D | Fmaj7 | Am | C | E | E | Am | C | D | Fmaj7 | Am | E | Am | E", repeat: 1 }
+];
+
+// Ablauf in Schlägen: Abschnitte (ein Akkord bis zum nächsten Wechsel, je eine Prüfung) und Takte für die Anzeige
+function songPlan(s) {
+  const segs = [], bars = [];
+  for (let r = 0; r < s.repeat; r++) for (const bar of s.chart.split("|")) {
+    const names = bar.trim().split(/\s+/), len = s.beats / names.length, tokens = [];
+    for (const n of names) {
+      const c = CHORDS.find(x => x.n === n), last = segs[segs.length - 1];
+      if (last && last.c === c) last.len += len; // derselbe Akkord geht weiter: ein Abschnitt
+      else segs.push({ c, start: bars.length * s.beats + tokens.length * len, len });
+      tokens.push({ c, seg: segs.length - 1 });
+    }
+    bars.push(tokens);
+  }
+  return { segs, bars, beats: bars.length * s.beats };
+}
+const segIndex = (plan, sb) => { let k = 0; while (k + 1 < plan.segs.length && plan.segs[k + 1].start <= sb) k++; return k; };
+
+let song = null;
+const songsOpen = () => $("songs").open;
+function songShow(plan, k) { $("songChord").textContent = plan.segs[k].c.n; drawDiagram(plan.segs[k].c, $("songDiagram")); }
+
+function songSetup() {
+  stopSong();
+  const s = SONGS[$("songSel").value], plan = songPlan(s), el = tag => document.createElement(tag);
+  $("songBpm").textContent = `${Math.round(s.bpm * $("songTempo").value)} Schläge pro Minute`;
+  $("songPattern").style.setProperty("--slots", s.pattern.length);
+  $("songPattern").setAttribute("aria-label", "Anschlag: " + [...s.pattern].map(p => p === "D" ? "ab" : p === "U" ? "auf" : "Pause").join(", "));
+  $("songPattern").replaceChildren(...[...s.pattern].map((p, i) => {
+    const d = el("div"), b = el("b"), n = el("span");
+    b.textContent = p === "D" ? "↓" : p === "U" ? "↑" : "·"; n.textContent = i % 2 ? "+" : i / 2 + 1;
+    d.append(b, n); return d;
+  }));
+  $("songChart").replaceChildren(...plan.bars.map(tokens => {
+    const d = el("div");
+    for (const tk of tokens) { const sp = el("span"); sp.textContent = tk.c.n; sp.dataset.seg = tk.seg; d.append(sp); }
+    return d;
+  }));
+  songShow(plan, 0);
+  $("songNext").textContent = `${plan.bars.length} Takte, ${s.beats} Schläge pro Takt`;
+  say($("songStatus"), "Tippe auf Vorspielen zum Anhören oder auf Mitspielen. Vorher wird ein Takt eingezählt.");
+}
+
+async function startSong(demo) {
+  stopSong();
+  audio(); // noch im Tipp starten, sonst bleibt der Ton auf iPhone/iPad stumm
+  const s = SONGS[$("songSel").value];
+  const me = song = { s, plan: songPlan(s), spb: 60 / (s.bpm * $("songTempo").value), demo, mic: !demo, t0: 0, slot: 0, seg: -1, hist: null, frames: 0, results: [], why: [], ticks: [], voices: [], ui: {} };
+  $("songChart").querySelectorAll("span").forEach(x => x.className = "");
+  [...$("songChart").children].forEach(x => x.classList.remove("now"));
+  songShow(me.plan, 0);
+  $("songNext").textContent = "Gleich wird eingezählt …";
+  $(demo ? "songDemo" : "songPlay").textContent = "■ Stopp";
+  if (demo) return say($("songStatus"), "Hör zu und lies mit. Erst wird ein Takt eingezählt.");
+  await startMic($("songStatus"), "Ich höre mit. Erst wird ein Takt eingezählt.");
+  if (song !== me) return;
+  me.mic = !!analyser;
+  if (!me.mic) say($("songStatus"), $("songStatus").innerHTML + " Ich zähle trotzdem ein, nur ohne Prüfung.");
+}
+
+function stopSong(msg) {
+  const me = song;
+  if (!me) return;
+  song = null;
+  for (const v of me.voices) try { v.gain.cancelScheduledValues(0); v.gain.setValueAtTime(0, ctx.currentTime); } catch {}
+  if (me.mic) stopMic();
+  $("songPlay").textContent = "▶ Mitspielen"; $("songDemo").textContent = "♪ Vorspielen";
+  $("songPattern").querySelectorAll("div").forEach(d => d.classList.remove("on"));
+  if (msg) say($("songStatus"), msg);
+}
+
+function songTick() {
+  const me = song;
+  if (me.mic && !analyser) return; // Mikrofon startet noch
+  if (ctx.state !== "running") return say($("songStatus"), "Tippe einmal auf den Bildschirm, damit der Ton startet.");
+  const ac = ctx, s = me.s, half = me.spb / 2, total = s.beats + me.plan.beats; // ein Takt Einzählen, dann der Song
+  if (!me.t0) me.t0 = ac.currentTime + 0.3;
+  // Klicks und beim Vorspielen die Anschläge 0,15 s im Voraus planen: so bleibt der Takt stabil, auch wenn die Anzeige ruckelt
+  while (me.slot < total * 2 && me.t0 + me.slot * half < ac.currentTime + 0.15) {
+    const when = me.t0 + me.slot * half, beat = me.slot / 2, sb = beat - s.beats, p = s.pattern[me.slot % s.pattern.length];
+    if (me.slot % 2 === 0) { tick(ac, when, beat % s.beats === 0); me.ticks.push(when); }
+    if (me.demo && sb >= 0 && p !== "-") {
+      for (const v of me.voices) v.gain.setTargetAtTime(0, when, 0.02); // ein neuer Anschlag dämpft den alten wie auf der Gitarre
+      me.voices = strum(ac, me.plan.segs[segIndex(me.plan, sb)].c, when, p === "U");
+    }
+    me.slot++;
+  }
+  const now = ac.currentTime, pos = (now - me.t0) / me.spb, sb = pos - s.beats;
+  if (pos < 0) return;
+  if (sb >= me.plan.beats) return finishSong();
+  songView(me, pos, sb);
+  if (me.mic && sb >= 0) {
+    analyser.getFloatTimeDomainData(timeData); analyser.getFloatFrequencyData(freqData);
+    let e = 0;
+    for (let i = timeData.length - 2048; i < timeData.length; i++) e += timeData[i] * timeData[i];
+    me.ticks = me.ticks.filter(x => now - x < 1);
+    songFeed(me, sb, Math.sqrt(e / 2048), freqData, ac.sampleRate / FFT, me.ticks.some(x => now >= x && now - x < 0.12));
+  }
+}
+
+function songView(me, pos, sb) {
+  const slot = Math.floor(pos * 2) % me.s.pattern.length;
+  if (slot !== me.ui.slot) { $("songPattern").querySelectorAll("div").forEach((d, i) => d.classList.toggle("on", i === slot)); me.ui.slot = slot; }
+  if (sb < 0) { $("songNext").textContent = `Einzählen … ${Math.ceil(-sb)}`; return; }
+  const k = segIndex(me.plan, sb), g = me.plan.segs[k], nx = me.plan.segs[k + 1], left = Math.ceil(g.start + g.len - sb - 1e-6);
+  if (k !== me.ui.seg) { songShow(me.plan, k); me.ui.seg = k; }
+  const bar = Math.floor(sb / me.s.beats), cells = $("songChart").children;
+  if (bar !== me.ui.bar) {
+    if (cells[me.ui.bar]) cells[me.ui.bar].classList.remove("now");
+    cells[bar].classList.add("now"); cells[bar].scrollIntoView({ block: "nearest" }); me.ui.bar = bar;
+  }
+  const n = left === 1 ? "Schlag" : nx ? "Schlägen" : "Schläge";
+  $("songNext").textContent = nx ? `dann ${nx.c.n} in ${left} ${n}` : `letzter Akkord, noch ${left} ${n}`;
+}
+
+// Prüfung pro Akkord: kurz nach dem Wechsel beginnen (Umgreifen und Nachklang auslassen), bis zum nächsten Wechsel sammeln, dann urteilen
+function songFeed(me, sb, level, freq, binHz, nearTick) {
+  const segs = me.plan.segs;
+  if (me.seg < 0) { me.seg = 0; me.hist = new Float32Array(120); me.frames = 0; }
+  while (me.seg < segs.length && sb >= segs[me.seg].start + segs[me.seg].len) { songJudge(me, me.seg++); me.hist = new Float32Array(120); me.frames = 0; }
+  const g = segs[me.seg];
+  if (!g) return;
+  const skip = Math.min(Math.max(0.5, 0.35 / me.spb), g.len * 0.4);
+  if (sb >= g.start + skip && !nearTick && level > MIN_LEVEL * 3) { addPeaks(me.hist, freq, binHz); me.frames++; }
+}
+function songJudge(me, k) {
+  const g = me.plan.segs[k], prev = me.plan.segs[k - 1], r = me.frames >= 6 ? judge(me.hist, g.c) : null;
+  const res = me.results[k] = !r ? "quiet" : r.ok ? "hit" : "miss";
+  me.why[k] = res === "hit" ? `<b>${g.c.n} sauber.</b>`
+    : res === "quiet" ? `<b>${g.c.n}: nichts gehört.</b> Spiel kräftiger oder näher am Handy.`
+    : prev && r.best === prev.c && r.bestScore > r.score ? `<b>Zu spät gewechselt:</b> klang noch nach ${prev.c.n} statt ${g.c.n}.`
+    : r.bestScore > r.score + 0.05 ? `<b>${g.c.n} nicht sauber:</b> klang eher nach ${r.best.n}.`
+    : `<b>${g.c.n} nicht ganz sauber.</b> Saiten fest hinter dem Bundstäbchen drücken.`;
+  $("songChart").querySelectorAll(`span[data-seg="${k}"]`).forEach(x => x.className = res);
+  say($("songStatus"), me.why[k]);
+}
+function songJudgeRest(me) {
+  for (me.seg = Math.max(me.seg, 0); me.seg < me.plan.segs.length; me.seg++) { songJudge(me, me.seg); me.hist = new Float32Array(120); me.frames = 0; }
+}
+function finishSong() {
+  const me = song;
+  if (me.mic) songJudgeRest(me);
+  const n = me.plan.segs.length, hits = me.results.filter(x => x === "hit").length, quiet = me.results.filter(x => x === "quiet").length;
+  stopSong(me.mic
+    ? `<b>Geschafft: ${hits} von ${n} Akkorden sauber.</b>` + (quiet ? ` ${quiet} habe ich nicht gehört.` : "")
+      + (hits === n ? " Stark! Probier das nächste Tempo." : " Die roten Akkorde im Ablauf noch einmal üben.")
+    : me.demo ? "<b>Das war's.</b> Jetzt du: tippe auf Mitspielen." : "<b>Geschafft!</b> Ohne Mikrofon gab es keine Prüfung.");
+}
+function openSongs() {
+  if (running) setRunning(false);
+  $("songs").showModal();
+  songSetup();
+  keepAwake();
+}
+
 function loop(t) {
   if (tunerOpen()) { if (analyser) tune(t); }
+  else if (songsOpen()) { if (song) songTick(); }
   else if (!advancing && running) {
     if (mode === "timer") {
       const frac = (t - timerStart) / (secs * 1000);
@@ -788,6 +1041,13 @@ document.addEventListener("pointerdown", () => {
   keepAwake();
   if (ctx && ctx.state !== "running") ctx.resume().catch(() => {}); // iOS: Audio nach Unterbrechung per Tipp wieder starten
 });
+$("songsBtn").onclick = openSongs;
+$("songsClose").onclick = () => $("songs").close();
+$("songs").addEventListener("close", () => stopSong()); // auch bei Escape
+$("songSel").onchange = $("songTempo").onchange = songSetup;
+$("songPlay").onclick = () => song && !song.demo ? stopSong("Gestoppt.") : startSong(false);
+$("songDemo").onclick = () => song && song.demo ? stopSong("Gestoppt.") : startSong(true);
+SONGS.forEach((s, i) => $("songSel").append(new Option(`${s.t} – ${s.a}`, i)));
 $("tunerBtn").onclick = openTuner;
 $("tunerClose").onclick = () => $("tuner").close();
 $("tuner").addEventListener("close", () => { if (!tunerOpen()) stopMic(); }); // auch bei Escape; verspätet nach Wiederöffnen: nichts tun
@@ -800,6 +1060,7 @@ STRING_NAMES.forEach((s, k) => {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") keepAwake();
   else if (tunerOpen()) $("tuner").close(); // beim Wegwischen Mikrofon freigeben
+  else if (song) stopSong("Angehalten. Tippe auf Mitspielen, um neu zu starten.");
   else if (running) setRunning(false);
 });
 $("secs").value = String(secs);
@@ -807,7 +1068,7 @@ $("secs").onchange = e => { secs = +e.target.value; store.set("secs", secs); res
 $("shuffle").checked = shuffle;
 $("shuffle").onchange = e => { shuffle = e.target.checked; store.set("shuffle", shuffle); buildQueue(false); render(); resetRound(); };
 document.addEventListener("keydown", e => {
-  if (tunerOpen() || e.target.closest("select, input")) return;
+  if (document.querySelector("dialog[open]") || e.target.closest("select, input")) return;
   if (e.code === "Space") { e.preventDefault(); next(mode === "manual"); }
   if (e.code === "Enter" && !e.target.closest("button")) { e.preventDefault(); playChord(queue[pos]); }
   if (e.code === "KeyP" && mode !== "manual") setRunning(!running);
