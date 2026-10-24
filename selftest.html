@@ -198,6 +198,67 @@ app.onload = async () => {
   me = await songRun(w, ts, () => null);
   check("Song: nicht gespielt, nur Metronom: alles „nicht gehört“, nichts rot", me.results.every(x => x === "quiet"), list(me));
 
+  // ---------- Kurs ----------
+  const LV = w.eval("LEVELS"), bad = [], ids = new Set(), seen = new Set(), early = [];
+  for (const L of LV) {
+    if (ids.has(L.id)) bad.push("doppelte id " + L.id);
+    ids.add(L.id);
+    if (!["tune", "chord", "change", "rhythm"].includes(L.type)) bad.push(L.id + ": unbekannte Art");
+    if (L.type === "change" && !(L.target > 0)) bad.push(L.id + ": kein Ziel");
+    if (L.type === "rhythm") {
+      if (L.song.pattern.length !== L.song.beats * 2) bad.push(L.id + ": Muster passt nicht zur Taktart");
+      for (const bar of L.song.chart.split("|")) if (!Number.isInteger(L.song.beats / bar.trim().split(/\s+/).length)) bad.push(L.id + ": Takt nicht aufteilbar");
+    }
+    if (L.type === "chord") seen.add(L.c);
+    const used = L.type === "chord" ? [L.c] : L.type === "change" ? [L.a, L.b] : L.type === "rhythm" ? L.song.chart.split(/[|\s]+/).filter(Boolean) : [];
+    for (const n of used) {
+      if (!CHORDS.some(c => c.n === n)) bad.push(`${L.id}: unbekannter Akkord ${n}`);
+      else if (!seen.has(n)) early.push(`${L.id}: ${n}`);
+    }
+  }
+  check(`Kurs: ${LV.length} Level, Daten stimmig`, !bad.length, bad.join("; ") || LV.map(L => L.id).join(" "));
+  check("Kurs: alle 12 Akkorde haben ein eigenes Level", CHORDS.every(c => LV.some(L => L.type === "chord" && L.c === c.n)), CHORDS.filter(c => !LV.some(L => L.c === c.n)).map(c => c.n).join(", ") || "alle 12");
+  check("Kurs: jeder Akkord wird gelernt, bevor er in Wechseln oder Übungen vorkommt", !early.length, early.join(", ") || "Reihenfolge passt");
+
+  const cf = w.eval(`(() => {
+    progress = {}; const r = {}, ok = { ok: true }, bad = { ok: false, score: 0.5, bestScore: 0.6, best: CHORDS[2], off: 0 };
+    r.open = [0, 1, 2].map(lvOpen);
+    showLevel(1); lvRun = { L: LEVELS[1], streak: 0, count: 0, start: 0, cur: 0 };
+    lvResult(ok, 1000); lvResult(ok, 2000); lvResult(bad, 3000);
+    r.afterMiss = { serie: $("lvProgress").textContent, status: $("lvStatus").textContent, red: $("lvCard").classList.contains("miss") };
+    lvResult(ok, 4000); lvResult(ok, 5000); r.notYet = !!progress.em; lvResult(ok, 6000);
+    r.chord = { done: !!(progress.em && progress.em.done), running: !!lvRun, status: $("lvStatus").textContent, open2: lvOpen(2), next: !$("lvNextBtn").hidden, skip: !$("lvSkip").hidden };
+    showLevel(3); lvRun = { L: LEVELS[3], streak: 0, count: 0, start: 0, cur: 0 };
+    for (let k = 0; k < 6; k++) lvResult(ok, 1000 + k * 3000);
+    r.target = lvTarget(lvRun); r.shown = $("lvChord").textContent;
+    lvFinish(lvRun.count >= LEVELS[3].target, lvRun.count);
+    r.changeLow = { done: !!progress["em-am"].done, best: progress["em-am"].best, status: $("lvStatus").textContent };
+    lvRun = { L: LEVELS[3], streak: 0, count: 0, start: 0, cur: 0 };
+    for (let k = 0; k < 9; k++) lvResult(ok, 1000 + k * 3000);
+    lvFinish(lvRun.count >= LEVELS[3].target, lvRun.count);
+    r.changeOk = { done: !!progress["em-am"].done, best: progress["em-am"].best };
+    showLevel(0); tuneDone = [true, true, true, true, true, false]; courseAfterTune(); r.tuneHalf = !!(progress.stimmen && progress.stimmen.done);
+    tuneDone = Array(6).fill(true); courseAfterTune(); r.tuneOk = !!progress.stimmen.done;
+    courseRecord(LEVELS[4], false, 75); r.r75 = { done: !!progress["takt-1"].done, open5: lvOpen(5) };
+    courseRecord(LEVELS[4], true, 85); r.r85 = { done: !!progress["takt-1"].done, best: progress["takt-1"].best, open5: lvOpen(5) };
+    r.open7 = lvOpen(7);
+    showLevel(5); $("lvSkip").click(); r.skip = { skipped: !!progress.d.skipped, done: !!progress.d.done, open6: lvOpen(6), shown: lvIdx };
+    renderCourse();
+    r.list = { count: $("courseCount").textContent, locked: [...$("courseList").querySelectorAll("button.lv")].filter(b => b.disabled).length, marks: [...$("courseList").querySelectorAll("button.lv .mark")].slice(0, 7).map(m => m.textContent).join(" ") };
+    progress = {}; lvRun = null;
+    return r;
+  })()`);
+  check("Kurs: am Anfang ist nur Level 1 offen", cf.open.join() === "true,false,false", cf.open.join());
+  check("Kurs: Akkord-Level, ein Fehlversuch setzt die Serie zurück und leuchtet rot", cf.afterMiss.serie === "Serie: 0 von 3" && cf.afterMiss.red && cf.afterMiss.status.includes("Serie beginnt von vorn") && !cf.notYet, JSON.stringify(cf.afterMiss));
+  check("Kurs: drei saubere hintereinander schaffen das Level und öffnen das nächste", cf.chord.done && !cf.chord.running && cf.chord.status.startsWith("Level geschafft") && cf.chord.open2 && cf.chord.next && !cf.chord.skip, JSON.stringify(cf.chord));
+  check("Kurs: Wechsel-Level zeigt immer den Akkord, der als Nächstes dran ist", cf.target === "Em" && cf.shown === "Em", `${cf.target} / ${cf.shown}`);
+  check("Kurs: 5 von 8 Wechseln reicht nicht, Bestwert wird trotzdem gespeichert", !cf.changeLow.done && cf.changeLow.best === 5 && cf.changeLow.status.includes("Das Ziel sind 8"), JSON.stringify(cf.changeLow));
+  check("Kurs: 8 Wechsel schaffen das Level, Bestwert 8", cf.changeOk.done && cf.changeOk.best === 8, JSON.stringify(cf.changeOk));
+  check("Kurs: Stimmen-Level erst geschafft, wenn alle sechs Saiten stimmen", !cf.tuneHalf && cf.tuneOk, `5 Saiten: ${cf.tuneHalf}, 6 Saiten: ${cf.tuneOk}`);
+  check("Kurs: Im-Takt-Level, 75 % reicht nicht, 85 % schon", !cf.r75.done && !cf.r75.open5 && cf.r85.done && cf.r85.best === 85 && cf.r85.open5, JSON.stringify([cf.r75, cf.r85]));
+  check("Kurs: Überspringen schaltet das nächste Level frei, zählt aber nicht als geschafft", cf.skip.skipped && !cf.skip.done && cf.skip.open6 && cf.skip.shown === 6 && !cf.open7, JSON.stringify(cf.skip));
+  check("Kurs: Übersicht zählt nur geschaffte Level und sperrt den Rest", cf.list.count === "4 von 26 Leveln geschafft" && cf.list.locked === 20, JSON.stringify(cf.list));
+
   sum.textContent = `Fertig: ${pass} bestanden, ${fail} durchgefallen (von ${pass + fail} bewerteten Fällen). ` +
     `Eine Saite einen Bund daneben: ${oneOffCaught} von ${oneOff} als falsch erkannt.`;
   window.__done = { pass, fail, oneOff, oneOffCaught, rows };

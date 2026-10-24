@@ -154,6 +154,28 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .song-btns button { flex: 1; min-height: 52px; }
 #songStatus { margin: 0; min-height: 3em; }
 
+/* Kurs: Kapitel mit Leveln, ein Level schaltet das nächste frei */
+.course-sum { display: grid; gap: 6px; }
+#courseList { display: grid; gap: 6px; max-height: 62vh; overflow-y: auto; }
+.course-ch { margin: 10px 0 0; }
+.lv { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; text-align: left; font-weight: 400; }
+.lv b { display: block; font-weight: 700; }
+.lv small { display: block; color: var(--muted); font-size: .82rem; }
+.lv .mark { display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid var(--line); border-radius: 50%; font-family: var(--f-mono); font-size: .8rem; font-weight: 700; }
+.lv.done .mark { background: var(--good); border-color: var(--good); color: var(--panel); }
+.lv.skipped .mark { border-style: dashed; }
+.lv.next { border-color: var(--brass); background: var(--brass-soft); }
+.lv:disabled { opacity: .45; cursor: default; }
+.lv:disabled:hover { border-color: var(--line); }
+.lv .best { font-family: var(--f-mono); font-size: .8rem; color: var(--muted); }
+.lv-title { margin: 2px 0; font-family: var(--f-display); font-size: 1.35rem; }
+.link { justify-self: start; padding: 6px 0; border: 0; background: none; color: var(--muted); text-decoration: underline; }
+#lvCard { transition: background .3s, border-color .3s; }
+#lvCard.hit { background: var(--good-soft); border-color: var(--good); }
+#lvCard.miss { background: var(--bad-soft); border-color: var(--bad); }
+#lvStatus, #lvProgress { margin: 0; }
+#lvStatus { min-height: 3em; }
+
 /* Handy: Tasten unten am Rand, damit man sie mit dem Daumen trifft */
 @media (max-width: 720px) {
   body { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
@@ -171,6 +193,7 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
   <header>
     <h1>Griffbrett-Trainer</h1>
     <div class="tools">
+      <button id="courseBtn" class="tool" type="button">Kurs</button>
       <button id="songsBtn" class="tool" type="button">Songs</button>
       <button id="tunerBtn" class="tool" type="button">Stimmgerät</button>
     </div>
@@ -261,14 +284,48 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
   </div>
 </dialog>
 
+<dialog id="course" aria-labelledby="courseTitle">
+  <div class="song">
+    <div class="tuner-head">
+      <h2 id="courseTitle">Kurs: Gitarre von Anfang an</h2>
+      <button id="courseClose" type="button">Fertig</button>
+    </div>
+    <div id="courseHome" class="song">
+      <div class="course-sum"><b id="courseCount"></b><div class="meter"><div id="courseBar"></div></div></div>
+      <div id="courseList"></div>
+    </div>
+    <div id="lvView" class="song" hidden>
+      <button id="lvBack" class="link" type="button">← Alle Level</button>
+      <div>
+        <p class="label" id="lvChapter"></p>
+        <h3 class="lv-title" id="lvTitle"></h3>
+        <p class="muted" id="lvGoal"></p>
+      </div>
+      <div class="song-now" id="lvCard">
+        <div><div class="song-chord" id="lvChord"></div><div class="muted" id="lvNext"></div></div>
+        <svg id="lvDiagram" viewBox="0 0 240 300" role="img" aria-label="Griffbild"></svg>
+      </div>
+      <p class="tip" id="lvTip"></p>
+      <div class="meter" id="lvMeter"><div></div></div>
+      <p class="status" id="lvProgress"></p>
+      <p class="status" id="lvStatus" aria-live="polite"></p>
+      <div class="song-btns">
+        <button id="lvStart" class="primary" type="button">▶ Start</button>
+        <button id="lvNextBtn" type="button" hidden>Nächstes Level →</button>
+      </div>
+      <button id="lvSkip" class="link" type="button">Level überspringen</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="songs" aria-labelledby="songsTitle">
   <div class="song">
     <div class="tuner-head">
       <h2 id="songsTitle">Songs</h2>
       <button id="songsClose" type="button">Fertig</button>
     </div>
-    <div class="row"><label for="songSel">Song</label><select id="songSel"></select></div>
-    <div class="row">
+    <div class="row" id="songPick"><label for="songSel">Song</label><select id="songSel"></select></div>
+    <div class="row" id="songTempoRow">
       <label for="songTempo">Tempo</label>
       <select id="songTempo"><option value="0.7">langsam</option><option value="0.85">mittel</option><option value="1">normal</option></select>
       <span class="muted" id="songBpm"></span>
@@ -550,8 +607,7 @@ function renderChips() {
   });
 }
 
-function flash(cls) {
-  const el = $("chordCard");
+function flash(cls, el = $("chordCard")) {
   el.classList.remove("hit", "miss"); void el.offsetWidth; el.classList.add(cls);
   clearTimeout(flash.timer); flash.timer = setTimeout(() => el.classList.remove(cls), 900);
 }
@@ -690,7 +746,7 @@ function setMode(m) {
 
 // ---------- Mikrofon (Akkorderkennung, Wechsel und Stimmgerät teilen es) ----------
 let stream = null, analyser = null, freqData = null, timeData = null, listener = null, silentSince = 0;
-const micWanted = () => tunerOpen() || !!(song && song.mic) || (running && usesMic());
+const micWanted = () => tunerOpen() || !!(song && song.mic) || !!lvRun || (running && usesMic());
 async function startMic(out, ready) {
   say(out, "Mikrofon wird gestartet …");
   let s;
@@ -749,11 +805,12 @@ function verdict(r) {
   if (r.ok && mode === "change") return changeHit();
   if (r.ok) { $("status").innerHTML = `<b>${queue[pos].n} sauber erkannt!</b>`; next(true); return; }
   flash("miss");
-  $("status").innerHTML = (r.bestScore > r.score + 0.05
+  $("status").innerHTML = missText(r);
+}
+const missText = r => (r.bestScore > r.score + 0.05
     ? `<b>Nicht ganz.</b> Klingt eher nach ${r.best.n}. Prüf, ob jeder Finger im richtigen Bund liegt.`
     : "<b>Nicht ganz sauber.</b> Drück die Saiten direkt hinter dem Bundstäbchen fest und schlag noch mal an.")
-    + (Math.abs(r.off) > 0.25 ? " Deine Gitarre klingt außerdem verstimmt." : "");
-}
+  + (Math.abs(r.off) > 0.25 ? " Deine Gitarre klingt außerdem verstimmt." : "");
 
 // ---------- Akkordwechsel: eine Minute zwischen zwei Akkorden hin und her ----------
 function changeHit() {
@@ -882,10 +939,14 @@ let song = null;
 const songsOpen = () => $("songs").open;
 function songShow(plan, k) { $("songChord").textContent = plan.segs[k].c.n; drawDiagram(plan.segs[k].c, $("songDiagram")); }
 
+// Song oder Kurs-Übung samt Tempofaktor; Übungen laufen immer in ihrem eigenen Tempo
+let songLevel = null;
+const songSrc = () => songLevel ? [songLevel.song, 1] : [SONGS[$("songSel").value], +$("songTempo").value];
+
 function songSetup() {
   stopSong();
-  const s = SONGS[$("songSel").value], plan = songPlan(s), el = tag => document.createElement(tag);
-  $("songBpm").textContent = `${Math.round(s.bpm * $("songTempo").value)} Schläge pro Minute`;
+  const [s, tempo] = songSrc(), plan = songPlan(s), el = tag => document.createElement(tag);
+  $("songBpm").textContent = `${Math.round(s.bpm * tempo)} Schläge pro Minute`;
   $("songPattern").style.setProperty("--slots", s.pattern.length);
   $("songPattern").setAttribute("aria-label", "Anschlag: " + [...s.pattern].map(p => p === "D" ? "ab" : p === "U" ? "auf" : "Pause").join(", "));
   $("songPattern").replaceChildren(...[...s.pattern].map((p, i) => {
@@ -900,14 +961,15 @@ function songSetup() {
   }));
   songShow(plan, 0);
   $("songNext").textContent = `${plan.bars.length} Takte, ${s.beats} Schläge pro Takt`;
-  say($("songStatus"), "Tippe auf Vorspielen zum Anhören oder auf Mitspielen. Vorher wird ein Takt eingezählt.");
+  say($("songStatus"), "Tippe auf Vorspielen zum Anhören oder auf Mitspielen. Vorher wird ein Takt eingezählt."
+    + (songLevel ? " Ziel: mindestens 80 % der Akkorde sauber und rechtzeitig." : ""));
 }
 
 async function startSong(demo) {
   stopSong();
   audio(); // noch im Tipp starten, sonst bleibt der Ton auf iPhone/iPad stumm
-  const s = SONGS[$("songSel").value];
-  const me = song = { s, plan: songPlan(s), spb: 60 / (s.bpm * $("songTempo").value), demo, mic: !demo, t0: 0, slot: 0, seg: -1, hist: null, frames: 0, results: [], why: [], ticks: [], voices: [], ui: {} };
+  const [s, tempo] = songSrc();
+  const me = song = { s, plan: songPlan(s), spb: 60 / (s.bpm * tempo), demo, mic: !demo, t0: 0, slot: 0, seg: -1, hist: null, frames: 0, results: [], why: [], ticks: [], voices: [], ui: {} };
   $("songChart").querySelectorAll("span").forEach(x => x.className = "");
   [...$("songChart").children].forEach(x => x.classList.remove("now"));
   songShow(me.plan, 0);
@@ -1003,21 +1065,210 @@ function finishSong() {
   const me = song;
   if (me.mic) songJudgeRest(me);
   const n = me.plan.segs.length, hits = me.results.filter(x => x === "hit").length, quiet = me.results.filter(x => x === "quiet").length;
+  const pct = Math.round(100 * hits / n), level = me.mic && songLevel;
+  const lvText = !level ? "" : pct >= 80 ? " <b>Level geschafft!</b>" : ` Für das Level brauchst du 80 %, diesmal waren es ${pct} %. Nochmal!`;
   stopSong(me.mic
     ? `<b>Geschafft: ${hits} von ${n} Akkorden sauber.</b>` + (quiet ? ` ${quiet} habe ich nicht gehört.` : "")
-      + (hits === n ? " Stark! Probier das nächste Tempo." : " Die roten Akkorde im Ablauf noch einmal üben.")
+      + (level ? lvText : hits === n ? " Stark! Probier das nächste Tempo." : " Die roten Akkorde im Ablauf noch einmal üben.")
     : me.demo ? "<b>Das war's.</b> Jetzt du: tippe auf Mitspielen." : "<b>Geschafft!</b> Ohne Mikrofon gab es keine Prüfung.");
+  if (level) { courseRecord(level, pct >= 80, pct); say($("lvStatus"), `<b>${pct} % sauber und rechtzeitig.</b>` + lvText); }
 }
-function openSongs() {
+function openSongs(level) {
   if (running) setRunning(false);
+  songLevel = level || null;
+  $("songPick").hidden = $("songTempoRow").hidden = !!songLevel;
+  $("songsTitle").textContent = songLevel ? songLevel.t : "Songs";
   $("songs").showModal();
   songSetup();
+  keepAwake();
+}
+
+// ---------- Kurs: Grundlagen Schritt für Schritt, jedes Level schaltet das nächste frei ----------
+// tune = alle Saiten stimmen, chord = Akkord 3-mal hintereinander sauber, change = Wechsel in einer Minute,
+// rhythm = Übung mit Metronom (läuft im Song-Fenster), mindestens 80 % der Akkorde sauber und rechtzeitig.
+// Jeder Akkord wird erst als eigenes Level gelernt, bevor er in Wechseln oder Übungen vorkommt (prüft selftest.html).
+const COURSE = [
+  ["Startklar", [
+    { id: "stimmen", type: "tune", t: "Gitarre stimmen", tip: "Eine verstimmte Gitarre klingt auch mit perfektem Griff falsch. Das Stimmgerät führt dich von der tiefen E- bis zur hohen e-Saite." },
+    { id: "em", type: "chord", c: "Em", t: "Dein erster Akkord: E-Moll" },
+    { id: "am", type: "chord", c: "Am", t: "A-Moll" },
+    { id: "em-am", type: "change", a: "Em", b: "Am", target: 8, t: "Wechsel E-Moll ↔ A-Moll", tip: "Heb die Finger als Gruppe an und setz sie gemeinsam neu auf. Erst sauber, dann schneller." },
+    { id: "takt-1", type: "rhythm", t: "Im Takt: E-Moll und A-Moll", song: { bpm: 60, beats: 4, pattern: "D-D-D-D-", chart: "Em | Em | Am | Am", repeat: 2 }, tip: "Ein Abschlag auf jeden Schlag. Zähl leise mit: 1, 2, 3, 4. Mit „Vorspielen“ hörst du vorher, wie es klingen soll." }
+  ]],
+  ["Die ersten Dur-Akkorde", [
+    { id: "d", type: "chord", c: "D", t: "D-Dur" },
+    { id: "g", type: "chord", c: "G", t: "G-Dur" },
+    { id: "g-d", type: "change", a: "G", b: "D", target: 8, t: "Wechsel G-Dur ↔ D-Dur" },
+    { id: "c", type: "chord", c: "C", t: "C-Dur" },
+    { id: "c-g", type: "change", a: "C", b: "G", target: 8, t: "Wechsel C-Dur ↔ G-Dur" },
+    { id: "takt-2", type: "rhythm", t: "Im Takt: G, D und C", song: { bpm: 60, beats: 4, pattern: "D-D-D-D-", chart: "G | D | C | G", repeat: 2 }, tip: "Ein Abschlag auf jeden Schlag. Greif den nächsten Akkord schon auf Schlag 4 vor." }
+  ]],
+  ["Rhythmus", [
+    { id: "takt-3", type: "rhythm", t: "Der erste Aufschlag", song: { bpm: 60, beats: 4, pattern: "D-D-DUDU", chart: "Em | C | G | D", repeat: 2 }, tip: "Auf 3 und 4 kommt nach dem Abschlag ein leichter Aufschlag. Die Hand schwingt gleichmäßig weiter, wie ein Pendel." },
+    { id: "am-c", type: "change", a: "Am", b: "C", target: 10, t: "Wechsel A-Moll ↔ C-Dur", tip: "Zeige- und Mittelfinger bleiben fast liegen, nur der Ringfinger wandert auf die A-Saite." },
+    { id: "takt-4", type: "rhythm", t: "Das klassische Anschlagmuster", song: { bpm: 66, beats: 4, pattern: "D-DU-UDU", chart: "Am | G | C | C", repeat: 2 }, tip: "Ab, ab-auf, auf-ab-auf. Auf der 3 schwingt die Hand nach unten, ohne die Saiten zu treffen." }
+  ]],
+  ["Mehr Akkorde", [
+    { id: "e", type: "chord", c: "E", t: "E-Dur" },
+    { id: "a", type: "chord", c: "A", t: "A-Dur" },
+    { id: "e-a", type: "change", a: "E", b: "A", target: 10, t: "Wechsel E-Dur ↔ A-Dur" },
+    { id: "dm", type: "chord", c: "Dm", t: "D-Moll" },
+    { id: "takt-5", type: "rhythm", t: "Im Takt: der Moll-Klang", song: { bpm: 70, beats: 4, pattern: "D-DU-UDU", chart: "Dm | Am | E | Am", repeat: 2 } }
+  ]],
+  ["Abschluss", [
+    { id: "e7", type: "chord", c: "E7", t: "E7" },
+    { id: "a7", type: "chord", c: "A7", t: "A7" },
+    { id: "d7", type: "chord", c: "D7", t: "D7" },
+    { id: "f", type: "chord", c: "Fmaj7", t: "F-Dur (einfache Form)" },
+    { id: "c-f", type: "change", a: "C", b: "Fmaj7", target: 10, t: "Wechsel C-Dur ↔ F-Dur" },
+    { id: "takt-6", type: "rhythm", t: "Im Takt: C, A-Moll, F, G", song: { bpm: 72, beats: 4, pattern: "D-DU-UDU", chart: "C | Am | Fmaj7 | G", repeat: 2 } },
+    { id: "finale", type: "rhythm", t: "Finale: zwei Akkorde pro Takt", song: { bpm: 72, beats: 4, pattern: "D-DU-UDU", chart: "G D | Em C | G D | C", repeat: 2 }, tip: "Hier wechselst du schon nach zwei Schlägen. Schau früh auf den nächsten Akkord." }
+  ]]
+];
+const LEVELS = COURSE.flatMap(([ch, levels], k) => levels.map(L => ({ ...L, ch: `Kapitel ${k + 1}: ${ch}` })));
+let progress = store.get("course", {}); // je Level-id: { done, skipped, best }
+let lvIdx = -1, lvRun = null;
+const courseOpen = () => $("course").open;
+const lvAt = () => LEVELS[lvIdx];
+const lvP = L => progress[L.id] || {};
+const lvOpen = i => i === 0 || !!(lvP(LEVELS[i - 1]).done || lvP(LEVELS[i - 1]).skipped);
+const lvGoal = L => L.type === "tune" ? "Ziel: alle sechs Saiten gestimmt"
+  : L.type === "chord" ? `Ziel: ${L.c} 3-mal hintereinander sauber anschlagen`
+  : L.type === "change" ? `Ziel: ${L.target} saubere Wechsel in einer Minute`
+  : `Ziel: mindestens 80 % der Akkorde sauber und rechtzeitig, ${L.song.bpm} Schläge pro Minute`;
+const lvBest = L => lvP(L).best == null ? "" : L.type === "change" ? `${lvP(L).best} pro Minute` : L.type === "rhythm" ? `${lvP(L).best} %` : "";
+
+function renderCourse() {
+  const done = LEVELS.filter(L => lvP(L).done).length, next = LEVELS.findIndex(L => !lvP(L).done && !lvP(L).skipped);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  $("courseCount").textContent = `${done} von ${LEVELS.length} Leveln geschafft`;
+  $("courseBar").style.width = done / LEVELS.length * 100 + "%";
+  const list = $("courseList");
+  list.replaceChildren();
+  LEVELS.forEach((L, i) => {
+    if (!i || L.ch !== LEVELS[i - 1].ch) list.append(el("p", "label course-ch", L.ch));
+    const p = lvP(L), b = el("button", "lv" + (p.done ? " done" : p.skipped ? " skipped" : i === next ? " next" : "")), txt = el("span");
+    b.type = "button"; b.disabled = !lvOpen(i);
+    txt.append(el("b", null, L.t), el("small", null, b.disabled ? "Gesperrt, erst das Level davor schaffen" : p.skipped && !p.done ? "Übersprungen" : lvGoal(L).replace("Ziel: ", "")));
+    b.append(el("span", "mark", p.done ? "✓" : String(i + 1)), txt, el("span", "best", lvBest(L)));
+    b.setAttribute("aria-label", `Level ${i + 1}: ${L.t}, ${p.done ? "geschafft" : p.skipped ? "übersprungen" : b.disabled ? "gesperrt" : "offen"}`);
+    b.onclick = () => showLevel(i);
+    list.append(b);
+  });
+}
+
+function showLevel(i) {
+  lvStop();
+  lvIdx = i;
+  const L = LEVELS[i], first = L.type === "chord" ? L.c : L.type === "change" ? L.a : null;
+  $("courseHome").hidden = true; $("lvView").hidden = false;
+  $("lvChapter").textContent = `Level ${i + 1} von ${LEVELS.length} · ${L.ch}`;
+  $("lvTitle").textContent = L.t;
+  $("lvGoal").textContent = lvGoal(L);
+  $("lvCard").hidden = $("lvMeter").hidden = !first;
+  if (first) lvShow(first, L.type === "change" ? `im Wechsel mit ${L.b}` : "");
+  $("lvTip").textContent = L.tip || (L.type === "chord" ? CHORDS.find(c => c.n === L.c).tip
+    : "Die Minute beginnt mit dem ersten sauberen Akkord, danach zählt jeder saubere Wechsel.");
+  $("lvStart").textContent = L.type === "tune" ? "Stimmgerät öffnen" : L.type === "rhythm" ? "Übung öffnen" : "▶ Start";
+  lvButtons(L);
+  say($("lvStatus"), lvP(L).done ? "Schon geschafft. Du kannst das Level jederzeit wiederholen." : "");
+}
+function lvButtons(L) {
+  const last = lvIdx + 1 >= LEVELS.length;
+  $("lvNextBtn").hidden = !lvP(L).done || last;
+  $("lvSkip").hidden = !!lvP(L).done || last;
+  $("lvProgress").textContent = lvBest(L) ? `Dein Bestwert: ${lvBest(L)}` : "";
+}
+function lvShow(n, next) {
+  $("lvChord").textContent = n;
+  $("lvNext").textContent = next;
+  drawDiagram(CHORDS.find(c => c.n === n), $("lvDiagram"));
+}
+
+// Ergebnis speichern; ein geschafftes Level schaltet das nächste frei
+function courseRecord(L, ok, value) {
+  const p = progress[L.id] = { ...lvP(L) };
+  if (value != null) p.best = Math.max(p.best || 0, value);
+  if (ok) { p.done = true; delete p.skipped; }
+  store.set("course", progress);
+  renderCourse();
+  if (lvAt() === L) lvButtons(L);
+}
+function courseAfterTune() {
+  const ok = tuneDone.length === 6 && tuneDone.every(Boolean);
+  courseRecord(lvAt(), ok);
+  say($("lvStatus"), ok ? "<b>Level geschafft!</b> Deine Gitarre ist gestimmt." : "Noch nicht alle Saiten gestimmt. Öffne das Stimmgerät noch einmal.");
+}
+
+async function lvToggle() {
+  const L = lvAt();
+  if (L.type === "tune") return openTuner();
+  if (L.type === "rhythm") return openSongs(L);
+  if (lvRun) return lvStop("Gestoppt.");
+  const me = lvRun = { L, streak: 0, count: 0, start: 0, cur: 0 };
+  lvShow(L.type === "chord" ? L.c : L.a, L.type === "change" ? `im Wechsel mit ${L.b}` : "");
+  $("lvStart").textContent = "■ Stopp";
+  $("lvProgress").textContent = L.type === "chord" ? "Serie: 0 von 3" : `0 von ${L.target} Wechseln`;
+  await startMic($("lvStatus"), L.type === "chord" ? `Schlag ${L.c} kräftig an und lass ihn klingen.` : `Spiel ${L.a}. Die Minute beginnt mit dem ersten sauberen Akkord.`);
+  if (lvRun === me && !analyser) { lvRun = null; $("lvStart").textContent = "▶ Start"; } // ohne Mikrofon geht es nicht, die Meldung bleibt stehen
+}
+function lvStop(msg) {
+  if (!lvRun) return;
+  lvRun = null;
+  stopMic();
+  $("lvStart").textContent = "▶ Start";
+  $("lvMeter").firstElementChild.style.width = "0";
+  if (msg) say($("lvStatus"), msg);
+}
+const lvTarget = me => me.L.type === "chord" ? me.L.c : me.cur ? me.L.b : me.L.a;
+function courseTick(t) {
+  const me = lvRun, L = me.L;
+  analyser.getFloatTimeDomainData(timeData); analyser.getFloatFrequencyData(freqData);
+  const ev = listener.feed(t, timeData, freqData, ctx.sampleRate / FFT);
+  $("lvMeter").firstElementChild.style.width = Math.max(0, Math.min(1, (20 * Math.log10(ev.level || 1e-9) + 60) / 50)) * 100 + "%";
+  if (L.type === "change" && me.start) {
+    const left = 60 - (t - me.start) / 1000;
+    if (left <= 0) return lvFinish(me.count >= L.target, me.count);
+    $("lvProgress").textContent = `Noch ${Math.min(60, Math.ceil(left))} s · ${me.count} von ${L.target} Wechseln`;
+  }
+  if (ev.listening) say($("lvStatus"), "Ich höre …");
+  else if (ev.ignored) say($("lvStatus"), "Zu kurz oder zu leise. Schlag kräftig an und lass den Akkord klingen.");
+  else if (ev.result) lvResult(judge(ev.result, CHORDS.find(c => c.n === lvTarget(me))), t);
+}
+function lvResult(r, t) {
+  const me = lvRun, L = me.L;
+  flash(r.ok ? "hit" : "miss", $("lvCard"));
+  if (L.type === "chord") {
+    me.streak = r.ok ? me.streak + 1 : 0;
+    $("lvProgress").textContent = `Serie: ${me.streak} von 3`;
+    if (me.streak >= 3) return lvFinish(true);
+    return say($("lvStatus"), r.ok ? `<b>Sauber!</b> Noch ${3 - me.streak}.` : missText(r) + " Die Serie beginnt von vorn.");
+  }
+  if (!r.ok) return say($("lvStatus"), missText(r));
+  if (me.start) me.count++; else me.start = t; // die Minute beginnt mit dem ersten sauberen Akkord
+  me.cur ^= 1;
+  lvShow(lvTarget(me), `im Wechsel mit ${me.cur ? L.a : L.b}`);
+  say($("lvStatus"), me.count ? `<b>${me.count}. Wechsel!</b> Jetzt ${lvTarget(me)}.` : `<b>Die Minute läuft.</b> Jetzt ${lvTarget(me)}.`);
+}
+function lvFinish(ok, value) {
+  const L = lvRun.L;
+  lvStop();
+  courseRecord(L, ok, value);
+  say($("lvStatus"), ok ? "<b>Level geschafft!</b>" + (L.type === "change" ? ` ${value} Wechsel in einer Minute.` : " Weiter geht's mit dem nächsten Level.")
+    : `<b>${value} Wechsel.</b> Das Ziel sind ${L.target}. Atme kurz durch und versuch es noch einmal.`);
+}
+function openCourse() {
+  if (running) setRunning(false);
+  $("lvView").hidden = true; $("courseHome").hidden = false;
+  renderCourse();
+  $("course").showModal();
   keepAwake();
 }
 
 function loop(t) {
   if (tunerOpen()) { if (analyser) tune(t); }
   else if (songsOpen()) { if (song) songTick(); }
+  else if (courseOpen()) { if (lvRun && analyser) courseTick(t); }
   else if (!advancing && running) {
     if (mode === "timer") {
       const frac = (t - timerStart) / (secs * 1000);
@@ -1041,7 +1292,21 @@ document.addEventListener("pointerdown", () => {
   keepAwake();
   if (ctx && ctx.state !== "running") ctx.resume().catch(() => {}); // iOS: Audio nach Unterbrechung per Tipp wieder starten
 });
-$("songsBtn").onclick = openSongs;
+$("courseBtn").onclick = openCourse;
+$("courseClose").onclick = () => $("course").close();
+$("course").addEventListener("close", () => lvStop());
+$("lvBack").onclick = () => { lvStop(); $("lvView").hidden = true; $("courseHome").hidden = false; renderCourse(); };
+$("lvStart").onclick = lvToggle;
+$("lvNextBtn").onclick = () => showLevel(lvIdx + 1);
+$("lvSkip").onclick = () => { // Ausweg, falls die Erkennung bei einem Level mit deiner Gitarre nicht klappt
+  const L = lvAt();
+  lvStop();
+  progress[L.id] = { ...lvP(L), skipped: true };
+  store.set("course", progress);
+  renderCourse();
+  showLevel(lvIdx + 1);
+};
+$("songsBtn").onclick = () => openSongs();
 $("songsClose").onclick = () => $("songs").close();
 $("songs").addEventListener("close", () => stopSong()); // auch bei Escape
 $("songSel").onchange = $("songTempo").onchange = songSetup;
@@ -1050,7 +1315,11 @@ $("songDemo").onclick = () => song && song.demo ? stopSong("Gestoppt.") : startS
 SONGS.forEach((s, i) => $("songSel").append(new Option(`${s.t} – ${s.a}`, i)));
 $("tunerBtn").onclick = openTuner;
 $("tunerClose").onclick = () => $("tuner").close();
-$("tuner").addEventListener("close", () => { if (!tunerOpen()) stopMic(); }); // auch bei Escape; verspätet nach Wiederöffnen: nichts tun
+$("tuner").addEventListener("close", () => { // auch bei Escape; verspätet nach Wiederöffnen: nichts tun
+  if (tunerOpen()) return;
+  stopMic();
+  if (courseOpen() && !$("lvView").hidden && lvAt().type === "tune") courseAfterTune();
+});
 STRING_NAMES.forEach((s, k) => {
   const b = document.createElement("button");
   b.type = "button"; b.textContent = s;
@@ -1061,6 +1330,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") keepAwake();
   else if (tunerOpen()) $("tuner").close(); // beim Wegwischen Mikrofon freigeben
   else if (song) stopSong("Angehalten. Tippe auf Mitspielen, um neu zu starten.");
+  else if (lvRun) lvStop("Angehalten. Tippe auf Start, um neu zu beginnen.");
   else if (running) setRunning(false);
 });
 $("secs").value = String(secs);
