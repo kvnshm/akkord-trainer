@@ -37,7 +37,8 @@ app.onload = async () => {
     // nur rund 13 dB über dem Rauschen: härter als echtes Spiel, darum nur angezeigt (die Grenze soll sichtbar bleiben)
     cases.push({ name: "richtig, sehr leise (kaum über dem Rauschen)", target: c, notes: notesOf(c.frets), gain: 0.015, noise: 0.0007, expect: undefined });
     cases.push({ name: "richtig, 44,1 kHz", target: c, notes: notesOf(c.frets), sr: 44100, expect: true });
-    for (const o of CHORDS) if (o !== c) cases.push({ name: "anderer Akkord: " + o.n, target: c, notes: notesOf(o.frets), expect: false });
+    // gleiche Töne (Dsus2/Asus4) sind für ein Mikrofon nicht unterscheidbar und zählen beide als richtig
+    for (const o of CHORDS) if (o !== c && !w.eval("sameNotes")(o, c)) cases.push({ name: "anderer Akkord: " + o.n, target: c, notes: notesOf(o.frets), expect: false });
     c.frets.forEach((f, i) => {
       if (f < 0) return;
       const up = c.frets.slice(); up[i] = f + 1;
@@ -45,8 +46,6 @@ app.onload = async () => {
       if (!samePcs(notesOf(up), c)) cases.push({ name: `Saite ${"EADGHe"[i]} einen Bund zu hoch`, target: c, notes: notesOf(up), oneOff: true });
       if (f > 0) { const dn = c.frets.slice(); dn[i] = f - 1;
         if (!samePcs(notesOf(dn), c)) cases.push({ name: `Saite ${"EADGHe"[i]} einen Bund zu tief`, target: c, notes: notesOf(dn), oneOff: true }); }
-      const mu = c.frets.slice(); mu[i] = -1;
-      cases.push({ name: `Saite ${"EADGHe"[i]} gedämpft`, target: c, notes: notesOf(mu), expect: undefined });
     });
   }
   cases.push({ name: "nur Rauschen", target: CHORDS[0], notes: [], noise: 0.003, expect: null });
@@ -78,6 +77,25 @@ app.onload = async () => {
     [name, ok ? "ok" : "FEHLER", detail].forEach(v => tr.insertCell().textContent = v);
     ok ? pass++ : fail++;
   };
+
+  // Griffe nachgerechnet: jeder Griff muss genau die Töne seines Akkords ergeben (deutsche Namen, H = B)
+  const TONES = { Em: "E G H", Am: "A C E", E: "E Gis H", A: "A Cis E", D: "D Fis A", Dm: "D F A", G: "G H D", C: "C E G",
+    E7: "E Gis H D", A7: "A Cis E G", D7: "D Fis A C", Fmaj7: "F A C E", G7: "G H D F",
+    C7: "C E B", // der übliche Griff x32310 lässt die Quinte G weg
+    H7: "H Dis Fis A", Em7: "E G H D", Am7: "A C E G", Dsus2: "D E A", Dsus4: "D G A", Asus2: "A H E", Asus4: "A D E",
+    Cadd9: "C D E G", F: "F A C", Hm: "H D Fis", "F#m": "Fis A Cis", H: "H Dis Fis" };
+  const PCN = w.eval("PC_NAMES"), wrongTones = [];
+  for (const c of CHORDS) {
+    const got = c.pcs.map(p => PCN[p]).sort().join(" "), want = (TONES[c.n] || "?").split(" ").sort().join(" ");
+    if (got !== want) wrongTones.push(`${c.n}: ${got} statt ${want}`);
+    if (c.frets.length !== 6 || c.fingers.length !== 6 || c.frets.some((f, i) => (f > 0) !== (c.fingers[i] > 0))) wrongTones.push(`${c.n}: Finger passen nicht zu den Bünden`);
+    if (c.barre && c.frets.some((f, i) => i >= c.barre[1] && i <= c.barre[2] && f < c.barre[0])) wrongTones.push(`${c.n}: Saite unter dem Barré tiefer als der Balken`);
+  }
+  check(`Griffe: alle ${CHORDS.length} Akkorde ergeben genau ihre Töne`, !wrongTones.length, wrongTones.join("; ") || "alle stimmen");
+  check("Griffbild: Barré als Balken, keine einzelnen Punkte darunter", (() => {
+    const svg = w.document.createElementNS("http://www.w3.org/2000/svg", "svg"); w.drawDiagram(CHORDS.find(c => c.n === "F"), svg);
+    return svg.querySelectorAll("rect").length === 1 && svg.querySelectorAll("circle").length === 3; // 3 Finger über dem Balken, keine Leersaiten
+  })(), "F-Dur: ein Balken, drei Finger");
 
   for (let i = 0; i < 6; i++) for (const det of [0, -0.25, 0.2]) for (const at of [0.55, 1.3]) {
     const sr = 48000, want = 440 * 2 ** ((OPEN[i] + det - 69) / 12);
@@ -197,25 +215,26 @@ app.onload = async () => {
   for (const L of LV) {
     if (ids.has(L.id)) bad.push("doppelte id " + L.id);
     ids.add(L.id);
-    if (!["tune", "chord", "change", "rhythm"].includes(L.type)) bad.push(L.id + ": unbekannte Art");
+    if (!["tune", "chord", "change", "rhythm", "mix"].includes(L.type)) bad.push(L.id + ": unbekannte Art");
     if (L.type === "change" && !(L.target > 0)) bad.push(L.id + ": kein Ziel");
+    if (L.type === "mix" && !(L.set && L.set.length >= 2)) bad.push(L.id + ": zu wenige Akkorde im Mix");
     if (L.type === "rhythm") {
       if (L.song.pattern.length !== L.song.beats * 2) bad.push(L.id + ": Muster passt nicht zur Taktart");
       for (const bar of L.song.chart.split("|")) if (!Number.isInteger(L.song.beats / bar.trim().split(/\s+/).length)) bad.push(L.id + ": Takt nicht aufteilbar");
     }
     if (L.type === "chord") seen.add(L.c);
-    const used = L.type === "chord" ? [L.c] : L.type === "change" ? [L.a, L.b] : L.type === "rhythm" ? L.song.chart.split(/[|\s]+/).filter(Boolean) : [];
+    const used = L.type === "chord" ? [L.c] : L.type === "change" ? [L.a, L.b] : L.type === "rhythm" ? L.song.chart.split(/[|\s]+/).filter(Boolean) : L.type === "mix" ? L.set : [];
     for (const n of used) {
       if (!CHORDS.some(c => c.n === n)) bad.push(`${L.id}: unbekannter Akkord ${n}`);
       else if (!seen.has(n)) early.push(`${L.id}: ${n}`);
     }
   }
   check(`Kurs: ${LV.length} Level, Daten stimmig`, !bad.length, bad.join("; ") || LV.map(L => L.id).join(" "));
-  check("Kurs: alle 12 Akkorde haben ein eigenes Level", CHORDS.every(c => LV.some(L => L.type === "chord" && L.c === c.n)), CHORDS.filter(c => !LV.some(L => L.c === c.n)).map(c => c.n).join(", ") || "alle 12");
+  check(`Kurs: alle ${CHORDS.length} Akkorde haben ein eigenes Level`, CHORDS.every(c => LV.some(L => L.type === "chord" && L.c === c.n)), CHORDS.filter(c => !LV.some(L => L.type === "chord" && L.c === c.n)).map(c => c.n).join(", ") || `alle ${CHORDS.length}`);
   check("Kurs: jeder Akkord wird gelernt, bevor er in Wechseln oder Übungen vorkommt", !early.length, early.join(", ") || "Reihenfolge passt");
 
   const cf = w.eval(`(() => {
-    progress = {}; const r = {}, ok = { ok: true }, bad = { ok: false, score: 0.5, bestScore: 0.6, best: CHORDS[2], off: 0 };
+    progress = {}; reviews = {}; const r = {}, ok = { ok: true }, bad = { ok: false, score: 0.5, bestScore: 0.6, best: CHORDS[2], off: 0 };
     r.open = [0, 1, 2].map(lvOpen);
     showLevel(1); lvRun = { L: LEVELS[1], streak: 0, count: 0, start: 0, cur: 0 };
     lvResult(ok, 1000); lvResult(ok, 2000); lvResult(bad, 3000);
@@ -236,10 +255,12 @@ app.onload = async () => {
     courseRecord(LEVELS[4], false, 75); r.r75 = { done: !!progress["takt-1"].done, open5: lvOpen(5) };
     courseRecord(LEVELS[4], true, 85); r.r85 = { done: !!progress["takt-1"].done, best: progress["takt-1"].best, open5: lvOpen(5) };
     r.open7 = lvOpen(7);
-    showLevel(5); $("lvSkip").click(); r.skip = { skipped: !!progress.d.skipped, done: !!progress.d.done, open6: lvOpen(6), shown: lvIdx };
+    const sk = LEVELS[5].id;
+    showLevel(5); $("lvSkip").click(); r.skip = { skipped: !!progress[sk].skipped, done: !!progress[sk].done, open6: lvOpen(6), shown: lvIdx };
+    r.reviewAfterEm = reviews.Em ? reviews.Em.due - DAY() : null;
     renderCourse();
-    r.list = { count: $("courseCount").textContent, locked: [...$("courseList").querySelectorAll("button.lv")].filter(b => b.disabled).length, marks: [...$("courseList").querySelectorAll("button.lv .mark")].slice(0, 7).map(m => m.textContent).join(" ") };
-    progress = {}; lvRun = null;
+    r.list = { count: $("courseCount").textContent, locked: [...$("courseList").querySelectorAll("button.lv")].filter(b => b.disabled).length, want: LEVELS.filter((L, i) => !lvOpen(i)).length, total: LEVELS.length };
+    progress = {}; reviews = {}; lvRun = null;
     return r;
   })()`);
   check("Kurs: am Anfang ist nur Level 1 offen", cf.open.join() === "true,false,false", cf.open.join());
@@ -251,7 +272,62 @@ app.onload = async () => {
   check("Kurs: Stimmen-Level erst geschafft, wenn alle sechs Saiten stimmen", !cf.tuneHalf && cf.tuneOk, `5 Saiten: ${cf.tuneHalf}, 6 Saiten: ${cf.tuneOk}`);
   check("Kurs: Im-Takt-Level, 75 % reicht nicht, 85 % schon", !cf.r75.done && !cf.r75.open5 && cf.r85.done && cf.r85.best === 85 && cf.r85.open5, JSON.stringify([cf.r75, cf.r85]));
   check("Kurs: Überspringen schaltet das nächste Level frei, zählt aber nicht als geschafft", cf.skip.skipped && !cf.skip.done && cf.skip.open6 && cf.skip.shown === 6 && !cf.open7, JSON.stringify(cf.skip));
-  check("Kurs: Übersicht zählt nur geschaffte Level und sperrt den Rest", cf.list.count === "4 von 26 Leveln geschafft" && cf.list.locked === 20, JSON.stringify(cf.list));
+  check("Kurs: Übersicht zählt nur geschaffte Level und sperrt den Rest", cf.list.count === `4 von ${cf.list.total} Leveln geschafft` && cf.list.locked === cf.list.want && cf.list.want > 40, JSON.stringify(cf.list));
+  check("Wiederholen: ein geschafftes Akkord-Level ist morgen zum ersten Mal fällig", cf.reviewAfterEm === 1, `fällig in ${cf.reviewAfterEm} Tag(en)`);
+
+  // Gemischtes Abrufen (Mix-Level)
+  const mx = w.eval(`(() => {
+    progress = {}; reviews = {}; const r = {}, ok = { ok: true }, bad = { ok: false, score: 0.5, bestScore: 0.6, best: CHORDS[2], off: 0 };
+    const i = LEVELS.findIndex(L => L.type === "mix"), L = LEVELS[i];
+    showLevel(i);
+    const run = () => { lvRun = { L, seq: mixSeq(L), k: 0, first: true, clean: 0, outcomes: [] }; lvPrompt(lvRun); return lvRun; };
+    let me = run();
+    r.seq = me.seq.slice();
+    r.hidden = $("lvDiagram").style.visibility === "hidden" && $("lvChord").textContent === me.seq[0];
+    lvResult(ok, 0); lvResult(bad, 0);
+    r.shownAfterMiss = $("lvDiagram").style.visibility === "visible";
+    while (lvRun) lvResult(ok, 0);
+    r.first = { done: !!progress[L.id].done, best: progress[L.id].best, status: $("lvStatus").textContent };
+    progress = {};
+    me = run();
+    for (let k = 0; k < 3; k++) { lvResult(bad, 0); lvResult(ok, 0); }
+    while (lvRun) lvResult(ok, 0);
+    r.weak = { done: !!progress[L.id].done, best: progress[L.id].best, status: $("lvStatus").textContent };
+    r.set = L.set; progress = {}; lvRun = null;
+    return r;
+  })()`);
+  const cnt2 = n => mx.seq.filter(x => x === n).length;
+  check("Mix: jeder Akkord gleich oft, nie zweimal hintereinander", mx.set.every(n => cnt2(n) === mx.seq.length / mx.set.length) && mx.seq.every((x, i) => !i || x !== mx.seq[i - 1]), mx.seq.join(" "));
+  check("Mix: nur der Name, das Griffbild kommt erst nach einem Fehler", mx.hidden && mx.shownAfterMiss, `versteckt ${mx.hidden}, nach Fehler sichtbar ${mx.shownAfterMiss}`);
+  check("Mix: 9 von 10 auf Anhieb schafft das Level (90 %)", mx.first.done && mx.first.best === 90 && mx.first.status.startsWith("Level geschafft"), JSON.stringify(mx.first));
+  check("Mix: 7 von 10 auf Anhieb reicht nicht (70 %)", !mx.weak.done && mx.weak.best === 70 && mx.weak.status.includes("Ziel sind 80"), JSON.stringify(mx.weak));
+
+  // Wiederholen mit wachsenden Abständen und Tagesplan
+  const sr = w.eval(`(() => {
+    progress = {}; reviews = {}; const r = {}, d0 = DAY(), ok = { ok: true }, bad = { ok: false, score: 0.5, bestScore: 0.6, best: CHORDS[2], off: 0 };
+    r.gaps = []; for (let k = 0; k < 6; k++) { schedule("Em", true); r.gaps.push(reviews.Em.due - d0); }
+    schedule("Em", false); r.afterFail = reviews.Em.due - d0;
+    reviews = {}; ["Em", "Am", "E", "A", "D", "G", "C", "Dm"].forEach((n, k) => reviews[n] = { step: 1, due: d0 - k });
+    r.due = dueChords();
+    renderToday(); r.todayDue = { title: $("todayTitle").textContent, btn: $("todayBtn").textContent };
+    reviews = { Em: { step: 1, due: d0 }, Am: { step: 2, due: d0 }, G: { step: 0, due: d0 - 1 } };
+    openCourse(); startReview();
+    r.review = { type: lvAt().type, set: lvAt().set.slice().sort().join(" "), skip: $("lvSkip").hidden };
+    lvRun = { L: lvAt(), seq: ["Em", "Am", "G"], k: 0, first: true, clean: 0, outcomes: [] }; lvPrompt(lvRun);
+    lvResult(ok, 0); lvResult(bad, 0); lvResult(ok, 0); lvResult(ok, 0);
+    r.after = { Em: reviews.Em.due - d0, Am: reviews.Am.due - d0, G: reviews.G.due - d0, status: $("lvStatus").textContent, next: !$("lvNextBtn").hidden && $("lvNextBtn").textContent };
+    reviews = {}; renderToday(); r.todayNew = { title: $("todayTitle").textContent, btn: $("todayBtn").textContent };
+    $("course").close(); progress = {}; reviews = {}; lvRun = null;
+    return r;
+  })()`);
+  check("Wiederholen: Abstände 1, 3, 7, 14, 30 Tage, danach bleibt es bei 30", sr.gaps.join() === "1,3,7,14,30,30", sr.gaps.join(", "));
+  check("Wiederholen: nicht auf Anhieb sauber heißt morgen wieder", sr.afterFail === 1, `in ${sr.afterFail} Tag(en)`);
+  check("Wiederholen: höchstens 6 pro Tag, die überfälligsten zuerst", sr.due.length === 6 && sr.due[0] === "Dm" && !sr.due.includes("Em") && !sr.due.includes("Am"), sr.due.join(", "));
+  check("Heute üben: fällige Wiederholungen stehen vorn", sr.todayDue.title === "6 Akkorde wiederholen" && sr.todayDue.btn === "Wiederholung starten", JSON.stringify(sr.todayDue));
+  check("Wiederholung: Em auf Anhieb (Schritt 1 → 7 Tage), Am mit Fehler (morgen), G auf Anhieb (Schritt 0 → 3 Tage)",
+    sr.review.type === "review" && sr.review.set === "Am Em G" && sr.review.skip && sr.after.Em === 7 && sr.after.Am === 1 && sr.after.G === 3 && sr.after.status.includes("Am kommt morgen"), JSON.stringify([sr.review, sr.after]));
+  check("Wiederholung: danach geht es zum nächsten neuen Level", sr.after.next === "Weiter zum neuen Level →", String(sr.after.next));
+  check("Heute üben: ohne Wiederholungen beginnt der Kurs bei Level 1", sr.todayNew.title === "Level 1: Gitarre stimmen" && sr.todayNew.btn === "Kurs beginnen", JSON.stringify(sr.todayNew));
 
   sum.textContent = `Fertig: ${pass} bestanden, ${fail} durchgefallen (von ${pass + fail} bewerteten Fällen). ` +
     `Eine Saite einen Bund daneben: ${oneOffCaught} von ${oneOff} als falsch erkannt.`;

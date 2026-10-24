@@ -1,3 +1,4 @@
+<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Griffbrett-Trainer</title>
@@ -36,9 +37,10 @@
   --good: #6fcf97; --good-soft: #1d3527; --bad: #f28b82; --bad-soft: #3b2220; color-scheme: dark }
 
 [hidden] { display: none !important; } /* außerhalb von claude.ai fehlt diese Grundregel sonst */
-body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5;
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 1rem; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 32px; }
-.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 20px; }
+@media (min-width: 768px) { html { font-size: 112.5%; } } /* iPad: alles etwas größer, die Abstände wachsen mit */
 header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 16px; }
 .tools { display: flex; gap: 8px; }
 @media (max-width: 480px) { header { grid-template-columns: minmax(0, 1fr); } }
@@ -54,7 +56,7 @@ h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.35rem; margin
 .chord-card.miss { background: var(--bad-soft); border-color: var(--bad); }
 .chord-name { font-family: var(--f-display); font-weight: 700; font-size: clamp(3.4rem, 10vw, 5rem); line-height: 1; letter-spacing: -0.03em; }
 .chord-long { color: var(--muted); font-size: 1rem; }
-#diagram { width: 100%; max-width: 280px; height: auto; margin-top: 8px; }
+#diagram { width: 100%; max-width: 18rem; height: auto; margin-top: 8px; }
 .notes { font-family: var(--f-mono); font-size: .85rem; color: var(--muted); letter-spacing: .04em; }
 .badge { position: absolute; top: 14px; right: 14px; font-family: var(--f-display); font-weight: 700; color: var(--good); opacity: 0; transition: opacity .2s; }
 .badge.bad { color: var(--bad); }
@@ -106,7 +108,12 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
 .tool { padding: 8px 14px; font-size: .92rem; }
 
 /* Stimmgerät: Dialog über allem, Zeiger zeigt ±50 Cent */
-dialog { box-sizing: border-box; width: min(440px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: var(--ink); padding: 20px; }
+dialog { box-sizing: border-box; width: min(42rem, calc(100% - 64px)); max-height: calc(100dvh - 64px); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: var(--ink); padding: 24px; }
+/* iPhone: Fenster füllen den ganzen Bildschirm, mit Abstand zu Notch und Home-Leiste */
+@media (max-width: 600px) {
+  dialog { width: 100%; max-width: none; height: 100%; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0;
+    padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+}
 dialog::backdrop { background: rgb(0 0 0 / .5); }
 .tuner { display: grid; gap: 14px; justify-items: center; text-align: center; }
 .tuner-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; }
@@ -132,7 +139,7 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .song { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .song > * { min-width: 0; }
 .song .label { margin: 0 0 6px; }
-.song-now { display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.song-now { display: grid; grid-template-columns: minmax(0, 1fr) clamp(130px, 40vw, 13rem); align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; }
 .song-chord { font-family: var(--f-display); font-weight: 700; font-size: 3.4rem; line-height: 1; }
 #songNext { margin-top: 4px; font-variant-numeric: tabular-nums; }
 #songDiagram { width: 100%; height: auto; }
@@ -142,7 +149,7 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .pattern span { font-family: var(--f-mono); font-size: .75rem; color: var(--muted); }
 .pattern div.on { background: var(--brass); }
 .pattern div.on b, .pattern div.on span { color: var(--panel); }
-.chart { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; max-height: 28vh; overflow-y: auto; }
+.chart { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
 .chart div { display: flex; justify-content: space-around; padding: 6px 2px; border: 1px solid var(--line); border-radius: 8px; font-family: var(--f-display); font-weight: 700; font-size: .95rem; }
 .chart div.now { border-color: var(--brass); background: var(--brass-soft); }
 .chart .hit { color: var(--good); }
@@ -154,7 +161,15 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 
 /* Kurs: Kapitel mit Leveln, ein Level schaltet das nächste frei */
 .course-sum { display: grid; gap: 6px; }
-#courseList { display: grid; gap: 6px; max-height: 62vh; overflow-y: auto; }
+#courseList { display: grid; gap: 6px; }
+.today { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; border-color: var(--brass); }
+.today > div { min-width: 0; flex: 1 1 16rem; }
+.today b { display: block; font-family: var(--f-display); font-size: 1.25rem; }
+.today .muted { margin: 2px 0 0; }
+.today button { min-height: 48px; }
+.why { font-size: .92rem; color: var(--muted); }
+.why summary { cursor: pointer; font-weight: 700; color: var(--ink); }
+.why ul { margin: 8px 0 0; padding-left: 1.2em; display: grid; gap: 4px; }
 .course-ch { margin: 10px 0 0; }
 .lv { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; text-align: left; font-weight: 400; }
 .lv b { display: block; font-weight: 700; }
@@ -162,7 +177,7 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .lv .mark { display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid var(--line); border-radius: 50%; font-family: var(--f-mono); font-size: .8rem; font-weight: 700; }
 .lv.done .mark { background: var(--good); border-color: var(--good); color: var(--panel); }
 .lv.skipped .mark { border-style: dashed; }
-.lv.next { border-color: var(--brass); background: var(--brass-soft); }
+.lv.up { border-color: var(--brass); background: var(--brass-soft); }
 .lv:disabled { opacity: .45; cursor: default; }
 .lv:disabled:hover { border-color: var(--line); }
 .lv .best { font-family: var(--f-mono); font-size: .8rem; color: var(--muted); }
@@ -196,6 +211,15 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
     </div>
     <span class="progress" id="progress">Akkord 1 von 12 · 0 geschafft</span>
   </header>
+
+  <section class="card today" aria-labelledby="todayTitle">
+    <div>
+      <p class="label" style="margin:0">Heute üben</p>
+      <b id="todayTitle"></b>
+      <p class="muted" id="todayText"></p>
+    </div>
+    <button id="todayBtn" class="primary" type="button">Training starten</button>
+  </section>
 
   <section class="stage">
     <div class="card chord-card" id="chordCard" aria-live="polite">
@@ -288,6 +312,24 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
       <button id="courseClose" type="button">Fertig</button>
     </div>
     <div id="courseHome" class="song">
+      <div class="card today">
+        <div>
+          <p class="label" style="margin:0">Heute üben</p>
+          <b id="courseTodayTitle"></b>
+          <p class="muted" id="courseTodayText"></p>
+        </div>
+        <button id="courseTodayBtn" class="primary" type="button">Training starten</button>
+      </div>
+      <details class="why">
+        <summary>So lernst du hier, und warum</summary>
+        <ul>
+          <li><b>Erst sauber, dann schnell.</b> Jedes Level hat ein klares Ziel. Tempo und Wechsel-Ziele steigen erst später.</li>
+          <li><b>Abrufen statt abschauen.</b> In gemischten Leveln und Wiederholungen siehst du nur den Namen. Sich erinnern festigt stärker als ablesen.</li>
+          <li><b>Gemischt üben.</b> Zufällige Reihenfolge fühlt sich schwerer an, bleibt aber deutlich besser hängen als immer derselbe Ablauf.</li>
+          <li><b>Wiederholen mit Abstand.</b> Gelernte Akkorde kommen nach 1, 3, 7, 14 und 30 Tagen wieder, kurz bevor du sie vergessen würdest.</li>
+          <li><b>Kurz und täglich.</b> 10 bis 20 Minuten am Tag wirken mehr als eine lange Einheit pro Woche, denn im Schlaf festigt sich das Geübte.</li>
+        </ul>
+      </details>
       <div class="course-sum"><b id="courseCount"></b><div class="meter"><div id="courseBar"></div></div></div>
       <div id="courseList"></div>
     </div>
@@ -360,9 +402,40 @@ const CHORDS = [
     tip: "Wie A-Dur, nur die G-Saite bleibt leer. Tiefe E-Saite nicht anschlagen." },
   { n: "D7", long: "D-Dur Septime", frets: [-1,-1,0,2,1,2], fingers: [0,0,0,2,1,3],
     tip: "Umgedrehtes Dreieck zu D-Dur: Zeigefinger 1. Bund auf der H-Saite. Ab D-Saite anschlagen." },
-  { n: "Fmaj7", long: "F-Dur (einfache Form)", frets: [-1,-1,3,2,1,0], fingers: [0,0,3,2,1,0],
-    tip: "Die Einsteiger-Version vom schweren F-Barré. Treppe 3-2-1 von der D- zur H-Saite, hohe e-Saite leer." }
+  { n: "Fmaj7", long: "Fmaj7 (einfaches F)", frets: [-1,-1,3,2,1,0], fingers: [0,0,3,2,1,0],
+    tip: "Die Einsteiger-Version vom schweren F-Barré. Treppe 3-2-1 von der D- zur H-Saite, hohe e-Saite leer." },
+  // ab hier: weitere wichtige Akkorde (Septakkorde, sus, add9, m7, Barré)
+  { n: "G7", long: "G-Dur Septime", frets: [3,2,0,0,0,1], fingers: [3,2,0,0,0,1],
+    tip: "Ringfinger tiefe E-Saite 3. Bund, Mittelfinger A-Saite 2. Bund, Zeigefinger hohe e-Saite 1. Bund. Alle sechs Saiten klingen." },
+  { n: "C7", long: "C-Dur Septime", frets: [-1,3,2,3,1,0], fingers: [0,3,2,4,1,0],
+    tip: "C-Dur plus kleiner Finger im 3. Bund der G-Saite. Tiefe E-Saite nicht anschlagen." },
+  { n: "H7", long: "H-Dur Septime", frets: [-1,2,1,2,0,2], fingers: [0,2,1,3,0,4],
+    tip: "Mittelfinger A-Saite 2. Bund, Zeigefinger D-Saite 1. Bund, Ringfinger G-Saite 2. Bund, kleiner Finger hohe e-Saite 2. Bund. Die H-Saite bleibt leer." },
+  { n: "Em7", long: "E-Moll Septime", frets: [0,2,0,0,0,0], fingers: [0,2,0,0,0,0],
+    tip: "Nur ein Finger: Mittelfinger in den 2. Bund der A-Saite. Alle sechs Saiten klingen." },
+  { n: "Am7", long: "A-Moll Septime", frets: [-1,0,2,0,1,0], fingers: [0,0,2,0,1,0],
+    tip: "A-Moll ohne Ringfinger: die G-Saite bleibt leer. Tiefe E-Saite nicht anschlagen." },
+  { n: "Dsus2", long: "D sus2", frets: [-1,-1,0,2,3,0], fingers: [0,0,0,1,3,0],
+    tip: "D-Dur ohne den Mittelfinger: die hohe e-Saite bleibt leer. Klingt offen und schwebend." },
+  { n: "Dsus4", long: "D sus4", frets: [-1,-1,0,2,3,3], fingers: [0,0,0,1,3,4],
+    tip: "D-Dur, aber der kleine Finger drückt die hohe e-Saite im 3. Bund. Zwischen D und Dsus4 hin und her klingt lebendig." },
+  { n: "Asus2", long: "A sus2", frets: [-1,0,2,2,0,0], fingers: [0,0,1,2,0,0],
+    tip: "Zeige- und Mittelfinger im 2. Bund auf D- und G-Saite, H- und e-Saite leer." },
+  { n: "Asus4", long: "A sus4", frets: [-1,0,2,2,3,0], fingers: [0,0,1,2,3,0],
+    tip: "Zeige- und Mittelfinger im 2. Bund auf D- und G-Saite, Ringfinger im 3. Bund auf der H-Saite." },
+  { n: "Cadd9", long: "C add9", frets: [-1,3,2,0,3,0], fingers: [0,2,1,0,3,0],
+    tip: "Mittelfinger A-Saite 3. Bund, Zeigefinger D-Saite 2. Bund, Ringfinger H-Saite 3. Bund. G- und e-Saite leer. Passt perfekt zu G." },
+  // Powerchords (E5, A5) bewusst nicht: mit nur zwei Tönen sind sie für das Mikrofon kaum von Em/Am zu unterscheiden
+  { n: "F", long: "F-Dur (Barré)", frets: [1,3,3,2,1,1], fingers: [1,3,4,2,1,1], barre: [1, 0, 5],
+    tip: "Der Zeigefinger drückt alle Saiten im 1. Bund, darauf die E-Dur-Form einen Bund höher. Zeigefinger leicht auf die Seite drehen, Daumen hinten mittig am Hals." },
+  { n: "Hm", long: "H-Moll (Barré)", frets: [-1,2,4,4,3,2], fingers: [0,1,3,4,2,1], barre: [2, 1, 5],
+    tip: "Zeigefinger im 2. Bund von der A- bis zur hohen e-Saite, darauf die A-Moll-Form zwei Bünde höher. Tiefe E-Saite nicht anschlagen." },
+  { n: "F#m", long: "Fis-Moll (Barré)", frets: [2,4,4,2,2,2], fingers: [1,3,4,1,1,1], barre: [2, 0, 5],
+    tip: "Zeigefinger im 2. Bund über alle Saiten, darauf die E-Moll-Form zwei Bünde höher." },
+  { n: "H", long: "H-Dur (Barré)", frets: [-1,2,4,4,4,2], fingers: [0,1,3,3,3,1], barre: [2, 1, 5],
+    tip: "Zeigefinger im 2. Bund ab der A-Saite, der Ringfinger liegt flach über D-, G- und H-Saite im 4. Bund. Die hohe e-Saite muss darunter frei klingen, das braucht Übung." }
 ];
+const BASIC = CHORDS.slice(0, 12).map(c => c.n); // Startauswahl für das freie Üben
 const OPEN_MIDI = [40, 45, 50, 55, 59, 64];          // E2 A2 D3 G3 H3 E4
 const STRING_NAMES = ["E","A","D","G","H","e"];
 const PC_NAMES = ["C","Cis","D","Dis","E","F","Fis","G","Gis","A","B","H"];
@@ -423,12 +496,21 @@ function chromaOf(hist) {
   return { ch: ch.map(Math.sqrt), off };
 }
 
+// Gleiche Töne (z. B. Dsus2 und Asus4) kann kein Mikrofon unterscheiden: solche Akkorde treten nicht gegeneinander an
+const sameNotes = (a, b) => a.pcs.length === b.pcs.length && a.pcs.every(p => b.pcs.includes(p));
+// Nur ein Ton Unterschied (G/G7, Em/Em7): darf knapp dahinter liegen. Selbsttest: richtige Griffe ≥ −0,005, Verwechslungen ≤ −0,027
+const NEAR_MARGIN = 0.02;
+const oneNoteApart = (a, b) => a.pcs.filter(p => !b.pcs.includes(p)).length + b.pcs.filter(p => !a.pcs.includes(p)).length === 1;
 function judge(hist, target) {
   const { ch, off } = chromaOf(hist);
   const score = correlation(ch, target.tpl);
-  let best = target, bestScore = -1;
-  for (const c of CHORDS) if (c !== target) { const s = correlation(ch, c.tpl); if (s > bestScore) { bestScore = s; best = c; } }
-  return { ok: score >= OK_SCORE && score >= bestScore, score, best, bestScore, off }; // der verlangte Akkord muss am besten passen
+  let best = target, bestScore = -1, bar = -1;
+  for (const c of CHORDS) if (c !== target && !sameNotes(c, target)) {
+    const s = correlation(ch, c.tpl);
+    if (s > bestScore) { bestScore = s; best = c; }
+    bar = Math.max(bar, oneNoteApart(c, target) ? s - NEAR_MARGIN : s);
+  }
+  return { ok: score >= OK_SCORE && score >= bar, score, best, bestScore, off }; // der verlangte Akkord muss am besten passen
 }
 
 // Erkennt einen Anschlag und sammelt danach 0,2 … 0,75 s lang Spektren. Liefert dann das Histogramm.
@@ -490,7 +572,7 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem("gt_" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem("gt_" + k, JSON.stringify(v)); } catch {} }
 };
-let enabled = store.get("enabled", CHORDS.map(c => c.n));
+let enabled = store.get("enabled", BASIC).filter(n => CHORDS.some(c => c.n === n));
 let mode = store.get("mode", "timer");
 let shuffle = store.get("shuffle", false);
 let secs = store.get("secs", 8);
@@ -508,21 +590,27 @@ function record(c, ok) {
   store.set("stats", stats);
 }
 
+// Zufällige Reihenfolge, nie zweimal dasselbe direkt hintereinander
+function spread(rest) {
+  rest = rest.slice();
+  const out = [];
+  while (rest.length) {
+    const last = out[out.length - 1];
+    // Ein Element, das mehr als die Hälfte des Rests ausmacht, muss jetzt dran, sonst bleiben am Ende nur gleiche übrig
+    const many = rest.find(c => c !== last && 2 * rest.filter(x => x === c).length > rest.length);
+    const ok = rest.map((c, i) => i).filter(i => rest[i] !== last);
+    out.push(rest.splice(many ? rest.indexOf(many) : ok.length ? ok[Math.floor(Math.random() * ok.length)] : 0, 1)[0]);
+  }
+  return out;
+}
+
 function buildQueue(keepCurrent) {
   const cur = queue[pos];
   queue = CHORDS.filter(c => enabled.includes(c.n));
   if (!queue.length) { enabled = [CHORDS[0].n]; queue = [CHORDS[0]]; }
   if (shuffle) {
     // Schwache Akkorde kommen öfter: unter 50 % Treffer dreimal, unter 80 % zweimal pro Durchgang, nie zweimal direkt hintereinander
-    const rest = queue.flatMap(c => { const r = rate(c); return Array(r === null || r >= 0.8 ? 1 : r >= 0.5 ? 2 : 3).fill(c); });
-    queue = [];
-    while (rest.length) {
-      const last = queue[queue.length - 1];
-      // Ein Akkord, der mehr als die Hälfte des Rests ausmacht, muss jetzt dran, sonst bleiben am Ende nur gleiche übrig
-      const many = rest.find(c => c !== last && 2 * rest.filter(x => x === c).length > rest.length);
-      const ok = rest.map((c, i) => i).filter(i => rest[i] !== last);
-      queue.push(rest.splice(many ? rest.indexOf(many) : ok.length ? ok[Math.floor(Math.random() * ok.length)] : 0, 1)[0]);
-    }
+    queue = spread(queue.flatMap(c => { const r = rate(c); return Array(r === null || r >= 0.8 ? 1 : r >= 0.5 ? 2 : 3).fill(c); }));
   }
   pos = keepCurrent && cur ? Math.max(0, queue.indexOf(cur)) : 0;
   if (mode === "change") pickPair();
@@ -550,11 +638,18 @@ function drawDiagram(c, svg = $("diagram")) {
     s += `<line x1="${X(0)}" x2="${X(5)}" y1="${Y0 + f*FH}" y2="${Y0 + f*FH}" stroke="var(--muted)" stroke-width="${f === 0 ? 7 : 2}" stroke-linecap="round"/>`;
     if (f > 0) s += `<text x="16" y="${Y0 + (f-0.5)*FH + 5}" font-size="13" fill="var(--muted)" font-family="var(--f-mono)" text-anchor="middle">${f}</text>`;
   }
+  for (let i = 0; i < 6; i++) s += `<line x1="${X(i)}" x2="${X(i)}" y1="${Y0}" y2="${Y0 + FRETS*FH}" stroke="var(--ink)" stroke-width="${2.6 - i*0.3}"/>`;
+  const [bf, b0, b1] = c.barre || [];
+  if (bf) { // Barré: ein Balken für den Zeigefinger über mehrere Saiten
+    const cy = Y0 + (bf - 0.5) * FH;
+    s += `<rect x="${X(b0) - 14}" y="${cy - 14}" width="${X(b1) - X(b0) + 28}" height="28" rx="14" fill="var(--dot)"/>`;
+    s += `<text x="${(X(b0) + X(b1)) / 2}" y="${cy + 6}" font-size="16" font-weight="700" text-anchor="middle" fill="var(--dot-ink)" font-family="var(--f-body)">1</text>`;
+  }
   for (let i = 0; i < 6; i++) {
-    s += `<line x1="${X(i)}" x2="${X(i)}" y1="${Y0}" y2="${Y0 + FRETS*FH}" stroke="var(--ink)" stroke-width="${2.6 - i*0.3}"/>`;
     const f = c.frets[i];
     if (f < 0) s += `<text x="${X(i)}" y="44" font-size="22" text-anchor="middle" fill="var(--muted)" font-family="var(--f-body)">×</text>`;
     else if (f === 0) s += `<circle cx="${X(i)}" cy="37" r="8" fill="none" stroke="var(--ink)" stroke-width="2.2"/>`;
+    else if (f === bf && i >= b0 && i <= b1) { /* liegt unter dem Barré-Balken */ }
     else {
       const cy = Y0 + (f - 0.5) * FH;
       s += `<circle cx="${X(i)}" cy="${cy}" r="14" fill="var(--dot)"/>`;
@@ -563,7 +658,7 @@ function drawDiagram(c, svg = $("diagram")) {
     s += `<text x="${X(i)}" y="${Y0 + FRETS*FH + 28}" font-size="15" text-anchor="middle" fill="${f < 0 ? "var(--line)" : "var(--muted)"}" font-family="var(--f-mono)">${STRING_NAMES[i]}</text>`;
   }
   svg.innerHTML = s;
-  svg.setAttribute("aria-label", `Griffbild ${c.long}: ` + c.frets.map((f, i) => `${STRING_NAMES[i]} ${f < 0 ? "nicht spielen" : f === 0 ? "leer" : "Bund " + f + ", Finger " + c.fingers[i]}`).join("; "));
+  svg.setAttribute("aria-label", `Griffbild ${c.long}: ` + (bf ? `Zeigefinger als Barré im ${bf}. Bund; ` : "") + c.frets.map((f, i) => `${STRING_NAMES[i]} ${f < 0 ? "nicht spielen" : f === 0 ? "leer" : "Bund " + f + ", Finger " + c.fingers[i]}`).join("; "));
 }
 
 function render() {
@@ -1058,10 +1153,12 @@ function openSongs(level) {
   keepAwake();
 }
 
-// ---------- Kurs: Grundlagen Schritt für Schritt, jedes Level schaltet das nächste frei ----------
-// tune = alle Saiten stimmen, chord = Akkord 3-mal hintereinander sauber, change = Wechsel in einer Minute,
-// rhythm = Übung mit Metronom (läuft im Song-Fenster), mindestens 80 % der Akkorde sauber und rechtzeitig.
-// Jeder Akkord wird erst als eigenes Level gelernt, bevor er in Wechseln oder Übungen vorkommt (prüft selftest.html).
+// ---------- Kurs: Grundlagen der Begleitgitarre, nach Lernforschung aufgebaut ----------
+// tune = alle Saiten stimmen · chord = Akkord 3-mal hintereinander sauber · change = Wechsel in einer Minute
+// rhythm = Übung mit Metronom, mindestens 80 % der Akkorde sauber und rechtzeitig
+// mix = Akkorde nur nach Namen in zufälliger Reihenfolge (Abruf + gemischtes Üben), mindestens 80 % auf Anhieb
+// Jeder Akkord wird erst als eigenes Level gelernt, bevor er woanders vorkommt (prüft selftest.html).
+// Bestehende ids bleiben, damit früherer Fortschritt erhalten bleibt.
 const COURSE = [
   ["Startklar", [
     { id: "stimmen", type: "tune", t: "Gitarre stimmen", tip: "Eine verstimmte Gitarre klingt auch mit perfektem Griff falsch. Das Stimmgerät führt dich von der tiefen E- bis zur hohen e-Saite." },
@@ -1071,58 +1168,133 @@ const COURSE = [
     { id: "takt-1", type: "rhythm", t: "Im Takt: E-Moll und A-Moll", song: { bpm: 60, beats: 4, pattern: "D-D-D-D-", chart: "Em | Em | Am | Am", repeat: 2 }, tip: "Ein Abschlag auf jeden Schlag. Zähl leise mit: 1, 2, 3, 4. Mit „Vorspielen“ hörst du vorher, wie es klingen soll." }
   ]],
   ["Die ersten Dur-Akkorde", [
-    { id: "d", type: "chord", c: "D", t: "D-Dur" },
-    { id: "g", type: "chord", c: "G", t: "G-Dur" },
-    { id: "g-d", type: "change", a: "G", b: "D", target: 8, t: "Wechsel G-Dur ↔ D-Dur" },
-    { id: "c", type: "chord", c: "C", t: "C-Dur" },
-    { id: "c-g", type: "change", a: "C", b: "G", target: 8, t: "Wechsel C-Dur ↔ G-Dur" },
-    { id: "takt-2", type: "rhythm", t: "Im Takt: G, D und C", song: { bpm: 60, beats: 4, pattern: "D-D-D-D-", chart: "G | D | C | G", repeat: 2 }, tip: "Ein Abschlag auf jeden Schlag. Greif den nächsten Akkord schon auf Schlag 4 vor." }
-  ]],
-  ["Rhythmus", [
-    { id: "takt-3", type: "rhythm", t: "Der erste Aufschlag", song: { bpm: 60, beats: 4, pattern: "D-D-DUDU", chart: "Em | C | G | D", repeat: 2 }, tip: "Auf 3 und 4 kommt nach dem Abschlag ein leichter Aufschlag. Die Hand schwingt gleichmäßig weiter, wie ein Pendel." },
-    { id: "am-c", type: "change", a: "Am", b: "C", target: 10, t: "Wechsel A-Moll ↔ C-Dur", tip: "Zeige- und Mittelfinger bleiben fast liegen, nur der Ringfinger wandert auf die A-Saite." },
-    { id: "takt-4", type: "rhythm", t: "Das klassische Anschlagmuster", song: { bpm: 66, beats: 4, pattern: "D-DU-UDU", chart: "Am | G | C | C", repeat: 2 }, tip: "Ab, ab-auf, auf-ab-auf. Auf der 3 schwingt die Hand nach unten, ohne die Saiten zu treffen." }
-  ]],
-  ["Mehr Akkorde", [
     { id: "e", type: "chord", c: "E", t: "E-Dur" },
     { id: "a", type: "chord", c: "A", t: "A-Dur" },
-    { id: "e-a", type: "change", a: "E", b: "A", target: 10, t: "Wechsel E-Dur ↔ A-Dur" },
-    { id: "dm", type: "chord", c: "Dm", t: "D-Moll" },
-    { id: "takt-5", type: "rhythm", t: "Im Takt: der Moll-Klang", song: { bpm: 70, beats: 4, pattern: "D-DU-UDU", chart: "Dm | Am | E | Am", repeat: 2 } }
+    { id: "e-a", type: "change", a: "E", b: "A", target: 8, t: "Wechsel E-Dur ↔ A-Dur" },
+    { id: "d", type: "chord", c: "D", t: "D-Dur" },
+    { id: "a-d", type: "change", a: "A", b: "D", target: 8, t: "Wechsel A-Dur ↔ D-Dur" },
+    { id: "mix-1", type: "mix", set: ["Em", "Am", "E", "A", "D"], t: "Gemischt: deine ersten fünf Akkorde" },
+    { id: "takt-ade", type: "rhythm", t: "Im Takt: A, D und E", song: { bpm: 60, beats: 4, pattern: "D-D-D-D-", chart: "A | D | E | A", repeat: 2 }, tip: "Ein Abschlag auf jeden Schlag. Greif den nächsten Akkord schon auf Schlag 4 vor." }
   ]],
-  ["Abschluss", [
+  ["G, C und der erste Rhythmus", [
+    { id: "g", type: "chord", c: "G", t: "G-Dur" },
+    { id: "c", type: "chord", c: "C", t: "C-Dur" },
+    { id: "c-g", type: "change", a: "G", b: "C", target: 8, t: "Wechsel G-Dur ↔ C-Dur" },
+    { id: "am-c", type: "change", a: "Am", b: "C", target: 10, t: "Wechsel A-Moll ↔ C-Dur", tip: "Zeige- und Mittelfinger bleiben fast liegen, nur der Ringfinger wandert auf die A-Saite." },
+    { id: "takt-aufschlag", type: "rhythm", t: "Der erste Aufschlag", song: { bpm: 60, beats: 4, pattern: "D-D-DUDU", chart: "G | C | D | G", repeat: 2 }, tip: "Auf 3 und 4 kommt nach dem Abschlag ein leichter Aufschlag. Die Hand schwingt gleichmäßig weiter, wie ein Pendel." },
+    { id: "mix-2", type: "mix", set: ["G", "C", "D", "Em", "Am", "E", "A"], t: "Gemischt: sieben Akkorde" },
+    { id: "takt-4", type: "rhythm", t: "Das klassische Anschlagmuster", song: { bpm: 66, beats: 4, pattern: "D-DU-UDU", chart: "Am | G | C | C", repeat: 2 }, tip: "Ab, ab-auf, auf-ab-auf. Auf der 3 schwingt die Hand nach unten, ohne die Saiten zu treffen." }
+  ]],
+  ["Moll und die ersten Septakkorde", [
+    { id: "dm", type: "chord", c: "Dm", t: "D-Moll" },
     { id: "e7", type: "chord", c: "E7", t: "E7" },
     { id: "a7", type: "chord", c: "A7", t: "A7" },
     { id: "d7", type: "chord", c: "D7", t: "D7" },
-    { id: "f", type: "chord", c: "Fmaj7", t: "F-Dur (einfache Form)" },
-    { id: "c-f", type: "change", a: "C", b: "Fmaj7", target: 10, t: "Wechsel C-Dur ↔ F-Dur" },
-    { id: "takt-6", type: "rhythm", t: "Im Takt: C, A-Moll, F, G", song: { bpm: 72, beats: 4, pattern: "D-DU-UDU", chart: "C | Am | Fmaj7 | G", repeat: 2 } },
-    { id: "finale", type: "rhythm", t: "Finale: zwei Akkorde pro Takt", song: { bpm: 72, beats: 4, pattern: "D-DU-UDU", chart: "G D | Em C | G D | C", repeat: 2 }, tip: "Hier wechselst du schon nach zwei Schlägen. Schau früh auf den nächsten Akkord." }
+    { id: "a7-d7", type: "change", a: "A7", b: "D7", target: 10, t: "Wechsel A7 ↔ D7" },
+    { id: "mix-3", type: "mix", set: ["Dm", "E7", "A7", "D7", "Am", "E"], t: "Gemischt: Moll und Septakkorde" },
+    { id: "takt-moll7", type: "rhythm", t: "Im Takt: Moll mit Septakkord", song: { bpm: 70, beats: 4, pattern: "D-DU-UDU", chart: "Am | Dm | E7 | Am", repeat: 2 } }
+  ]],
+  ["Septakkorde für jede Tonart", [
+    { id: "g7", type: "chord", c: "G7", t: "G7" },
+    { id: "c7", type: "chord", c: "C7", t: "C7" },
+    { id: "h7", type: "chord", c: "H7", t: "H7" },
+    { id: "e-h7", type: "change", a: "E", b: "H7", target: 10, t: "Wechsel E-Dur ↔ H7", tip: "Der Mittelfinger bleibt auf der A-Saite im 2. Bund liegen, er ist dein Anker." },
+    { id: "takt-e", type: "rhythm", t: "Im Takt: die Tonart E", song: { bpm: 72, beats: 4, pattern: "D-DU-UDU", chart: "E | A | H7 | E", repeat: 2 } },
+    { id: "mix-4", type: "mix", set: ["G7", "C7", "H7", "E7", "A7", "D7"], t: "Gemischt: alle Septakkorde" }
+  ]],
+  ["Klangfarben: sus, add9 und m7", [
+    { id: "dsus2", type: "chord", c: "Dsus2", t: "Dsus2" },
+    { id: "dsus4", type: "chord", c: "Dsus4", t: "Dsus4" },
+    { id: "takt-dsus", type: "rhythm", t: "Im Takt: D mit Verzierungen", song: { bpm: 72, beats: 4, pattern: "D-DU-UDU", chart: "D Dsus4 | D Dsus2 | D Dsus4 | D", repeat: 2 }, tip: "Die Finger für D bleiben liegen, nur ein Finger kommt dazu oder geht weg." },
+    { id: "asus2", type: "chord", c: "Asus2", t: "Asus2" },
+    { id: "asus4", type: "chord", c: "Asus4", t: "Asus4" },
+    { id: "em7", type: "chord", c: "Em7", t: "Em7" },
+    { id: "am7", type: "chord", c: "Am7", t: "Am7" },
+    { id: "cadd9", type: "chord", c: "Cadd9", t: "Cadd9" },
+    { id: "mix-5", type: "mix", set: ["Dsus2", "Dsus4", "Asus2", "Asus4", "Em7", "Am7", "Cadd9"], t: "Gemischt: alle Klangfarben" },
+    { id: "takt-pop", type: "rhythm", t: "Im Takt: moderner Pop-Klang", song: { bpm: 76, beats: 4, pattern: "D-DU-UDU", chart: "G | Cadd9 | Em7 | Dsus4", repeat: 2 } }
+  ]],
+  ["Barré-Akkorde", [
+    { id: "f", type: "chord", c: "Fmaj7", t: "Fmaj7: das einfache F als Vorstufe" },
+    { id: "c-f", type: "change", a: "C", b: "Fmaj7", target: 10, t: "Wechsel C-Dur ↔ Fmaj7" },
+    { id: "f-barre", type: "chord", c: "F", t: "F-Dur als Barré", tip: "Erst nur den Zeigefinger als Barré auflegen und jede Saite einzeln zupfen, bis alle klingen. Dann die anderen Finger dazu. Barré braucht Tage, nicht Minuten." },
+    { id: "hm", type: "chord", c: "Hm", t: "H-Moll" },
+    { id: "fism", type: "chord", c: "F#m", t: "Fis-Moll" },
+    { id: "h", type: "chord", c: "H", t: "H-Dur" },
+    { id: "mix-6", type: "mix", set: ["F", "Hm", "F#m", "H", "Fmaj7"], t: "Gemischt: Barré-Akkorde" },
+    { id: "takt-hm", type: "rhythm", t: "Im Takt: der beliebteste Pop-Ablauf", song: { bpm: 76, beats: 4, pattern: "D-DU-UDU", chart: "D | A | Hm | G", repeat: 2 } }
+  ]],
+  ["Flüssig spielen", [
+    { id: "tempo-em-am", type: "change", a: "Em", b: "Am", target: 20, t: "Tempo: E-Moll ↔ A-Moll", tip: "Jetzt zählt Tempo. Bleib locker, ein sauberer Wechsel ist mehr wert als drei hastige." },
+    { id: "tempo-g-c", type: "change", a: "G", b: "C", target: 20, t: "Tempo: G-Dur ↔ C-Dur" },
+    { id: "mix-7", type: "mix", set: ["C", "G", "Am", "F", "D", "Em", "E", "A", "Dm", "Hm"], t: "Gemischt: die zehn wichtigsten Akkorde" },
+    { id: "takt-cgamf", type: "rhythm", t: "Im Takt: vier Akkorde, die du überall hörst", song: { bpm: 80, beats: 4, pattern: "D-DU-UDU", chart: "C | G | Am | F", repeat: 2 } },
+    { id: "finale-80", type: "rhythm", t: "Finale: zwei Akkorde pro Takt", song: { bpm: 80, beats: 4, pattern: "D-DU-UDU", chart: "G D | Em C | G D | C", repeat: 2 }, tip: "Hier wechselst du schon nach zwei Schlägen. Schau früh auf den nächsten Akkord." }
   ]]
 ];
 const LEVELS = COURSE.flatMap(([ch, levels], k) => levels.map(L => ({ ...L, ch: `Kapitel ${k + 1}: ${ch}` })));
 let progress = store.get("course", {}); // je Level-id: { done, skipped, best }
-let lvIdx = -1, lvRun = null;
+let lvIdx = -1, lvCur = null, lvRun = null;
 const courseOpen = () => $("course").open;
-const lvAt = () => LEVELS[lvIdx];
-const lvP = L => progress[L.id] || {};
-const lvOpen = i => i === 0 || !!(lvP(LEVELS[i - 1]).done || lvP(LEVELS[i - 1]).skipped);
+const lvAt = () => lvCur;
+const lvP = L => (L.id && progress[L.id]) || {};
+const lvOpen = i => i === 0 || !!(lvP(LEVELS[i]).done || lvP(LEVELS[i - 1]).done || lvP(LEVELS[i - 1]).skipped);
+const nextLevel = () => LEVELS.findIndex(L => !lvP(L).done && !lvP(L).skipped);
+const mixCount = L => L.type === "review" ? L.set.length : Math.max(8, Math.min(12, L.set.length * 2));
 const lvGoal = L => L.type === "tune" ? "Ziel: alle sechs Saiten gestimmt"
   : L.type === "chord" ? `Ziel: ${L.c} 3-mal hintereinander sauber anschlagen`
   : L.type === "change" ? `Ziel: ${L.target} saubere Wechsel in einer Minute`
+  : L.type === "mix" ? `Ziel: ${mixCount(L)} Akkorde nur nach Namen, mindestens 80 % auf Anhieb sauber`
+  : L.type === "review" ? `${L.set.length} ${L.set.length === 1 ? "Akkord" : "Akkorde"} aus dem Gedächtnis, je einmal`
   : `Ziel: mindestens 80 % der Akkorde sauber und rechtzeitig, ${L.song.bpm} Schläge pro Minute`;
-const lvBest = L => lvP(L).best == null ? "" : L.type === "change" ? `${lvP(L).best} pro Minute` : L.type === "rhythm" ? `${lvP(L).best} %` : "";
+const lvBest = L => lvP(L).best == null ? "" : L.type === "change" ? `${lvP(L).best} pro Minute` : L.type === "rhythm" || L.type === "mix" ? `${lvP(L).best} %` : "";
+
+// ---------- Wiederholen in wachsenden Abständen: jeder gelernte Akkord kommt nach 1, 3, 7, 14, 30 Tagen wieder ----------
+const GAPS = [1, 3, 7, 14, 30];
+const DAY = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000); // heutiger Tag, Ortszeit
+let reviews = store.get("reviews", {}); // je Akkord: { step, due }
+function schedule(n, ok) { // sauber auf Anhieb: nächster, längerer Abstand; sonst morgen wieder
+  const step = ok ? Math.min((reviews[n] ? reviews[n].step : -1) + 1, GAPS.length - 1) : 0;
+  reviews[n] = { step, due: DAY() + GAPS[step] };
+  store.set("reviews", reviews);
+}
+// fällig sind höchstens 6 pro Tag: kurze Einheiten wirken besser als lange
+const dueChords = () => Object.entries(reviews).filter(([n, r]) => r.due <= DAY() && CHORDS.some(c => c.n === n))
+  .sort((a, b) => a[1].due - b[1].due || a[1].step - b[1].step).slice(0, 6).map(([n]) => n);
+// wer vorher schon Akkord-Level geschafft hat, bekommt sie einmal zum Wiederholen
+for (const L of LEVELS) if (L.type === "chord" && lvP(L).done && !reviews[L.c]) reviews[L.c] = { step: 0, due: DAY() };
+store.set("reviews", reviews);
+
+// Tagesplan: erst fällige Wiederholungen, dann das nächste neue Level (Startseite und Kurs-Übersicht)
+function renderToday() {
+  const due = dueChords(), next = nextLevel(), L = LEVELS[next], today = DAY();
+  const soon = Object.values(reviews).map(r => r.due).filter(d => d > today).sort((a, b) => a - b)[0];
+  const lvName = L ? `Level ${next + 1}: ${L.t}` : "";
+  const title = due.length ? `${due.length} ${due.length === 1 ? "Akkord" : "Akkorde"} wiederholen` : L ? lvName : "Kurs abgeschlossen";
+  const text = due.length ? `${due.join(", ")}. Danach ${L ? lvName : "freies Üben"}.`
+    : (L ? (next === 0 ? "Schritt für Schritt von der ersten Saite bis zum Barré." : "Heute nichts zu wiederholen, weiter mit Neuem.") : "Stark! Übe frei weiter.")
+      + (soon ? ` Nächste Wiederholung ${soon - today === 1 ? "morgen" : `in ${soon - today} Tagen`}.` : "");
+  const btn = due.length ? "Wiederholung starten" : L ? (next === 0 ? "Kurs beginnen" : "Weiter lernen") : "Kurs öffnen";
+  for (const [t, x, b] of [["todayTitle", "todayText", "todayBtn"], ["courseTodayTitle", "courseTodayText", "courseTodayBtn"]]) {
+    $(t).textContent = title; $(x).textContent = text; $(b).textContent = btn;
+  }
+}
+function startToday() {
+  if (dueChords().length) startReview();
+  else if (nextLevel() >= 0) showLevel(nextLevel());
+}
 
 function renderCourse() {
-  const done = LEVELS.filter(L => lvP(L).done).length, next = LEVELS.findIndex(L => !lvP(L).done && !lvP(L).skipped);
+  const done = LEVELS.filter(L => lvP(L).done).length, next = nextLevel();
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  renderToday();
   $("courseCount").textContent = `${done} von ${LEVELS.length} Leveln geschafft`;
   $("courseBar").style.width = done / LEVELS.length * 100 + "%";
   const list = $("courseList");
   list.replaceChildren();
   LEVELS.forEach((L, i) => {
     if (!i || L.ch !== LEVELS[i - 1].ch) list.append(el("p", "label course-ch", L.ch));
-    const p = lvP(L), b = el("button", "lv" + (p.done ? " done" : p.skipped ? " skipped" : i === next ? " next" : "")), txt = el("span");
+    const p = lvP(L), b = el("button", "lv" + (p.done ? " done" : p.skipped ? " skipped" : i === next ? " up" : "")), txt = el("span");
     b.type = "button"; b.disabled = !lvOpen(i);
     txt.append(el("b", null, L.t), el("small", null, b.disabled ? "Gesperrt, erst das Level davor schaffen" : p.skipped && !p.done ? "Übersprungen" : lvGoal(L).replace("Ziel: ", "")));
     b.append(el("span", "mark", p.done ? "✓" : String(i + 1)), txt, el("span", "best", lvBest(L)));
@@ -1133,38 +1305,55 @@ function renderCourse() {
 }
 
 function showLevel(i) {
-  lvStop();
   lvIdx = i;
-  const L = LEVELS[i], first = L.type === "chord" ? L.c : L.type === "change" ? L.a : null;
+  showLevelView(LEVELS[i], `Level ${i + 1} von ${LEVELS.length} · ${LEVELS[i].ch}`);
+}
+function startReview() {
+  lvIdx = -1;
+  showLevelView({ type: "review", t: "Wiederholung von heute", set: dueChords() }, "Heute üben · Wiederholung");
+}
+function showLevelView(L, chapter) {
+  lvStop();
+  lvCur = L;
+  const recall = L.type === "mix" || L.type === "review", first = L.type === "chord" ? L.c : L.type === "change" ? L.a : null;
   $("courseHome").hidden = true; $("lvView").hidden = false;
-  $("lvChapter").textContent = `Level ${i + 1} von ${LEVELS.length} · ${L.ch}`;
+  $("lvChapter").textContent = chapter;
   $("lvTitle").textContent = L.t;
   $("lvGoal").textContent = lvGoal(L);
-  $("lvCard").hidden = $("lvMeter").hidden = !first;
+  $("lvCard").hidden = $("lvMeter").hidden = !first && !recall;
   if (first) lvShow(first, L.type === "change" ? `im Wechsel mit ${L.b}` : "");
+  if (recall) lvShow("?", `Gleich: ${mixCount(L)} Akkorde in zufälliger Reihenfolge, nur der Name`, false);
   $("lvTip").textContent = L.tip || (L.type === "chord" ? CHORDS.find(c => c.n === L.c).tip
+    : L.type === "mix" ? "Abrufen aus dem Gedächtnis festigt einen Griff stärker als Abschauen. Bei einem Fehler zeige ich dir das Griffbild."
+    : L.type === "review" ? "Diese Akkorde sind heute fällig. Was auf Anhieb sitzt, kommt erst in ein paar Tagen wieder, der Rest schon morgen."
     : "Die Minute beginnt mit dem ersten sauberen Akkord, danach zählt jeder saubere Wechsel.");
   $("lvStart").textContent = L.type === "tune" ? "Stimmgerät öffnen" : L.type === "rhythm" ? "Übung öffnen" : "▶ Start";
   lvButtons(L);
   say($("lvStatus"), lvP(L).done ? "Schon geschafft. Du kannst das Level jederzeit wiederholen." : "");
+  $("course").scrollTop = 0;
 }
 function lvButtons(L) {
-  const last = lvIdx + 1 >= LEVELS.length;
-  $("lvNextBtn").hidden = !lvP(L).done || last;
-  $("lvSkip").hidden = !!lvP(L).done || last;
+  const review = L.type === "review", last = !review && lvIdx + 1 >= LEVELS.length;
+  $("lvNextBtn").textContent = review ? "Weiter zum neuen Level →" : "Nächstes Level →";
+  $("lvNextBtn").hidden = review ? !L.finished || nextLevel() < 0 : !lvP(L).done || last;
+  $("lvSkip").hidden = review || !!lvP(L).done || last;
   $("lvProgress").textContent = lvBest(L) ? `Dein Bestwert: ${lvBest(L)}` : "";
 }
-function lvShow(n, next) {
+function lvShow(n, next, diagram = true) {
+  const c = CHORDS.find(x => x.n === n);
   $("lvChord").textContent = n;
   $("lvNext").textContent = next;
-  drawDiagram(CHORDS.find(c => c.n === n), $("lvDiagram"));
+  if (c) drawDiagram(c, $("lvDiagram"));
+  $("lvDiagram").style.visibility = c && diagram ? "visible" : "hidden"; // beim Abrufen erst nach einem Fehler zeigen
 }
 
 // Ergebnis speichern; ein geschafftes Level schaltet das nächste frei
 function courseRecord(L, ok, value) {
+  if (!L.id) return;
   const p = progress[L.id] = { ...lvP(L) };
   if (value != null) p.best = Math.max(p.best || 0, value);
   if (ok) { p.done = true; delete p.skipped; }
+  if (ok && L.type === "chord" && !reviews[L.c]) schedule(L.c, true); // ab jetzt in den Wiederholungen
   store.set("course", progress);
   renderCourse();
   if (lvAt() === L) lvButtons(L);
@@ -1180,11 +1369,14 @@ async function lvToggle() {
   if (L.type === "tune") return openTuner();
   if (L.type === "rhythm") return openSongs(L);
   if (lvRun) return lvStop("Gestoppt.");
-  const me = lvRun = { L, streak: 0, count: 0, start: 0, cur: 0 };
-  lvShow(L.type === "chord" ? L.c : L.a, L.type === "change" ? `im Wechsel mit ${L.b}` : "");
+  const recall = L.type === "mix" || L.type === "review";
+  const me = lvRun = { L, streak: 0, count: 0, start: 0, cur: 0, seq: recall ? mixSeq(L) : null, k: 0, first: true, clean: 0, outcomes: [] };
+  if (recall) lvPrompt(me);
+  else lvShow(L.type === "chord" ? L.c : L.a, L.type === "change" ? `im Wechsel mit ${L.b}` : "");
   $("lvStart").textContent = "■ Stopp";
-  $("lvProgress").textContent = L.type === "chord" ? "Serie: 0 von 3" : `0 von ${L.target} Wechseln`;
-  await startMic($("lvStatus"), L.type === "chord" ? `Schlag ${L.c} kräftig an und lass ihn klingen.` : `Spiel ${L.a}. Die Minute beginnt mit dem ersten sauberen Akkord.`);
+  $("lvProgress").textContent = L.type === "chord" ? "Serie: 0 von 3" : recall ? `0 von ${me.seq.length}` : `0 von ${L.target} Wechseln`;
+  await startMic($("lvStatus"), L.type === "chord" ? `Schlag ${L.c} kräftig an und lass ihn klingen.`
+    : recall ? "Greif den Akkord, dessen Name oben steht, und schlag ihn an." : `Spiel ${L.a}. Die Minute beginnt mit dem ersten sauberen Akkord.`);
   if (lvRun === me && !analyser) { lvRun = null; $("lvStart").textContent = "▶ Start"; } // ohne Mikrofon geht es nicht, die Meldung bleibt stehen
 }
 function lvStop(msg) {
@@ -1195,7 +1387,14 @@ function lvStop(msg) {
   $("lvMeter").firstElementChild.style.width = "0";
   if (msg) say($("lvStatus"), msg);
 }
-const lvTarget = me => me.L.type === "chord" ? me.L.c : me.cur ? me.L.b : me.L.a;
+const lvTarget = me => me.seq ? me.seq[me.k] : me.L.type === "chord" ? me.L.c : me.cur ? me.L.b : me.L.a;
+// Mix: jeder Akkord gleich oft, Wiederholung: jeder fällige einmal; nie derselbe zweimal hintereinander
+function mixSeq(L) {
+  const n = mixCount(L), pool = [];
+  while (pool.length < n) pool.push(...L.set);
+  return spread(pool.slice(0, Math.ceil(n / L.set.length) * L.set.length)).slice(0, n);
+}
+function lvPrompt(me) { lvShow(me.seq[me.k], "aus dem Gedächtnis greifen", false); }
 function courseTick(t) {
   const me = lvRun, L = me.L;
   analyser.getFloatTimeDomainData(timeData); analyser.getFloatFrequencyData(freqData);
@@ -1213,6 +1412,20 @@ function courseTick(t) {
 function lvResult(r, t) {
   const me = lvRun, L = me.L;
   flash(r.ok ? "hit" : "miss", $("lvCard"));
+  if (me.seq) { // Mix und Wiederholung: Abruf nach Namen, Griffbild nur als Hilfe nach einem Fehler
+    const n = me.seq[me.k];
+    if (!r.ok) {
+      if (me.first) { me.first = false; lvShow(n, "so wird er gegriffen", true); }
+      return say($("lvStatus"), missText(r) + " Spiel ihn sauber, dann geht es weiter.");
+    }
+    if (me.first) me.clean++;
+    me.outcomes.push([n, me.first]);
+    me.k++; me.first = true;
+    $("lvProgress").textContent = `${me.k} von ${me.seq.length} · ${me.clean} auf Anhieb`;
+    if (me.k >= me.seq.length) return lvFinishRecall();
+    lvPrompt(me);
+    return say($("lvStatus"), `<b>Sauber!</b> Nächster: ${me.seq[me.k]}.`);
+  }
   if (L.type === "chord") {
     me.streak = r.ok ? me.streak + 1 : 0;
     $("lvProgress").textContent = `Serie: ${me.streak} von 3`;
@@ -1232,11 +1445,28 @@ function lvFinish(ok, value) {
   say($("lvStatus"), ok ? "<b>Level geschafft!</b>" + (L.type === "change" ? ` ${value} Wechsel in einer Minute.` : " Weiter geht's mit dem nächsten Level.")
     : `<b>${value} Wechsel.</b> Das Ziel sind ${L.target}. Atme kurz durch und versuch es noch einmal.`);
 }
+function lvFinishRecall() {
+  const me = lvRun, L = me.L, n = me.seq.length, pct = Math.round(100 * me.clean / n);
+  lvStop();
+  if (L.type === "review") {
+    for (const [c, ok] of me.outcomes) schedule(c, ok);
+    const again = me.outcomes.filter(o => !o[1]).map(o => o[0]);
+    L.finished = true;
+    lvButtons(L); renderToday();
+    return say($("lvStatus"), `<b>Wiederholung fertig: ${me.clean} von ${n} auf Anhieb.</b> `
+      + (again.length ? `${again.join(", ")} ${again.length === 1 ? "kommt" : "kommen"} morgen noch einmal.` : "Alles saß, die nächsten Abstände werden länger.")
+      + (nextLevel() >= 0 ? " Jetzt das nächste Level?" : ""));
+  }
+  courseRecord(L, pct >= 80, pct);
+  say($("lvStatus"), pct >= 80 ? `<b>Level geschafft!</b> ${pct} % auf Anhieb.`
+    : `<b>${pct} % auf Anhieb.</b> Ziel sind 80 %. Schau dir die Griffe, bei denen das Bild kam, noch einmal an und versuch es dann erneut.`);
+}
 function openCourse() {
   if (running) setRunning(false);
   $("lvView").hidden = true; $("courseHome").hidden = false;
   renderCourse();
   $("course").showModal();
+  $("course").scrollTop = 0;
   keepAwake();
 }
 
@@ -1269,10 +1499,12 @@ document.addEventListener("pointerdown", () => {
 });
 $("courseBtn").onclick = openCourse;
 $("courseClose").onclick = () => $("course").close();
-$("course").addEventListener("close", () => lvStop());
+$("course").addEventListener("close", () => { lvStop(); renderToday(); });
+$("todayBtn").onclick = () => { openCourse(); startToday(); };
+$("courseTodayBtn").onclick = startToday;
 $("lvBack").onclick = () => { lvStop(); $("lvView").hidden = true; $("courseHome").hidden = false; renderCourse(); };
 $("lvStart").onclick = lvToggle;
-$("lvNextBtn").onclick = () => showLevel(lvIdx + 1);
+$("lvNextBtn").onclick = () => { const n = lvCur.type === "review" ? nextLevel() : lvIdx + 1; if (n >= 0) showLevel(n); };
 $("lvSkip").onclick = () => { // Ausweg, falls die Erkennung bei einem Level mit deiner Gitarre nicht klappt
   const L = lvAt();
   lvStop();
@@ -1299,7 +1531,7 @@ STRING_NAMES.forEach((s, k) => {
   $("tunerStrings").append(b);
 });
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") keepAwake();
+  if (document.visibilityState === "visible") { keepAwake(); renderToday(); } // vielleicht ist inzwischen ein neuer Tag
   else if (tunerOpen()) $("tuner").close(); // beim Wegwischen Mikrofon freigeben
   else if (song) stopSong("Angehalten. Tippe auf Mitspielen, um neu zu starten.");
   else if (lvRun) lvStop("Angehalten. Tippe auf Start, um neu zu beginnen.");
@@ -1320,5 +1552,6 @@ buildQueue(false);
 render();
 setMode(mode);
 renderBests();
+renderToday();
 requestAnimationFrame(loop);
 </script>
