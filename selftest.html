@@ -172,31 +172,25 @@ app.onload = async () => {
   check("Stimmen: nach allen sechs Saiten fertig", tg.all.step === -1 && tg.all.st.startsWith("Alle sechs Saiten passen") && !tg.all.done.includes("false") && tg.all.note === "✓", JSON.stringify(tg.all));
   check("Stimmen: Antippen einer Saite stimmt sie noch einmal", tg.again.step === 3 && tg.again.done === "true,true,true,false,true,true", JSON.stringify(tg.again));
 
-  // ---------- Songs ----------
-  for (const s of w.eval("SONGS")) {
-    const plan = w.songPlan(s), bad = [];
-    if (s.pattern.length !== s.beats * 2) bad.push("Anschlagmuster passt nicht zur Taktart");
-    for (const bar of s.chart.split("|")) {
-      const names = bar.trim().split(/\s+/);
-      if (!Number.isInteger(s.beats / names.length)) bad.push("Takt nicht aufteilbar: " + bar);
-      for (const n of names) if (!CHORDS.some(c => c.n === n)) bad.push("unbekannter Akkord " + n);
-    }
-    if (plan.beats !== s.chart.split("|").length * s.beats * s.repeat) bad.push("Gesamtlänge falsch");
-    if (plan.segs.some((g, i) => i && (g.c === plan.segs[i - 1].c || g.start !== plan.segs[i - 1].start + plan.segs[i - 1].len))) bad.push("Abschnitte lückenhaft");
-    check(`Song „${s.t}“: Daten stimmig`, !bad.length, bad.join("; ") || `${plan.bars.length} Takte, ${plan.segs.length} Akkorde im Ablauf`);
+  // ---------- Übung im Takt (Im-Takt-Level): Ablauf und Prüfung mit offline gespielten Akkorden ----------
+  for (const L of w.eval("LEVELS").filter(L => L.type === "rhythm")) {
+    const s = L.song, plan = w.songPlan(s);
+    const ok = plan.beats === s.chart.split("|").length * s.beats * s.repeat
+      && !plan.segs.some((g, i) => i && (g.c === plan.segs[i - 1].c || g.start !== plan.segs[i - 1].start + plan.segs[i - 1].len));
+    check(`Übung „${L.t}“: Ablauf lückenlos`, ok, `${plan.bars.length} Takte, ${plan.segs.length} Akkorde im Ablauf`);
   }
   const ts = { t: "Test", a: "", bpm: 84, beats: 4, pattern: "D-DU-UDU", chart: "Em | C | G | D | Am | G D", repeat: 1 };
   const segs = w.songPlan(ts).segs, at = sb => segs.filter(g => g.start <= sb).pop().c.n, list = me => me.results.join(" ");
   let me = await songRun(w, ts, at);
-  check("Song: alles richtig gespielt, alle Akkorde grün (auch zwei Akkorde in einem Takt)", me.results.length === 7 && me.results.every(x => x === "hit"), list(me));
+  check("Übung: alles richtig gespielt, alle Akkorde grün (auch zwei Akkorde in einem Takt)", me.results.length === 7 && me.results.every(x => x === "hit"), list(me));
   me = await songRun(w, ts, at, { gain: 0.1 });
-  check("Song: leiser gespielt, trotzdem alle grün", me.results.every(x => x === "hit"), list(me));
+  check("Übung: leiser gespielt, trotzdem alle grün", me.results.every(x => x === "hit"), list(me));
   me = await songRun(w, ts, sb => sb >= 8 && sb < 12 ? "Am" : at(sb));
-  check("Song: Am statt G im dritten Takt, nur dieser rot", me.results[2] === "miss" && me.results.filter(x => x === "hit").length === 6, `${list(me)} · ${me.why[2]}`);
+  check("Übung: Am statt G im dritten Takt, nur dieser rot", me.results[2] === "miss" && me.results.filter(x => x === "hit").length === 6, `${list(me)} · ${me.why[2]}`);
   me = await songRun(w, ts, sb => sb >= 12 && sb < 14.5 ? "G" : at(sb));
-  check("Song: zweieinhalb Schläge zu spät zu D gewechselt, rot mit Hinweis „zu spät“", me.results[3] === "miss" && me.why[3].includes("Zu spät"), `${list(me)} · ${me.why[3]}`);
+  check("Übung: zweieinhalb Schläge zu spät zu D gewechselt, rot mit Hinweis „zu spät“", me.results[3] === "miss" && me.why[3].includes("Zu spät"), `${list(me)} · ${me.why[3]}`);
   me = await songRun(w, ts, () => null);
-  check("Song: nicht gespielt, nur Metronom: alles „nicht gehört“, nichts rot", me.results.every(x => x === "quiet"), list(me));
+  check("Übung: nicht gespielt, nur Metronom: alles „nicht gehört“, nichts rot", me.results.every(x => x === "quiet"), list(me));
 
   // ---------- Kurs ----------
   const LV = w.eval("LEVELS"), bad = [], ids = new Set(), seen = new Set(), early = [];

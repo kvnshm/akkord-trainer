@@ -128,11 +128,9 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .scale-labels { display: flex; justify-content: space-between; width: 100%; margin-top: -8px; font-size: .8rem; color: var(--muted); }
 #tunerStatus { margin: 0; min-height: 3em; }
 
-/* Songs: aktueller Akkord, Anschlagmuster in Achteln, Ablauf Takt für Takt */
+/* Übung im Takt (und Grundgerüst des Kurs-Fensters): aktueller Akkord, Anschlagmuster in Achteln, Ablauf Takt für Takt */
 .song { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .song > * { min-width: 0; }
-.song .row select { flex: 1; min-width: 0; max-width: 100%; }
-.song .row #songTempo { flex: 0 0 auto; }
 .song .label { margin: 0 0 6px; }
 .song-now { display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; }
 .song-chord { font-family: var(--f-display); font-weight: 700; font-size: 3.4rem; line-height: 1; }
@@ -194,7 +192,6 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
     <h1>Griffbrett-Trainer</h1>
     <div class="tools">
       <button id="courseBtn" class="tool" type="button">Kurs</button>
-      <button id="songsBtn" class="tool" type="button">Songs</button>
       <button id="tunerBtn" class="tool" type="button">Stimmgerät</button>
     </div>
     <span class="progress" id="progress">Akkord 1 von 12 · 0 geschafft</span>
@@ -321,14 +318,8 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 <dialog id="songs" aria-labelledby="songsTitle">
   <div class="song">
     <div class="tuner-head">
-      <h2 id="songsTitle">Songs</h2>
+      <h2 id="songsTitle">Übung</h2>
       <button id="songsClose" type="button">Fertig</button>
-    </div>
-    <div class="row" id="songPick"><label for="songSel">Song</label><select id="songSel"></select></div>
-    <div class="row" id="songTempoRow">
-      <label for="songTempo">Tempo</label>
-      <select id="songTempo"><option value="0.7">langsam</option><option value="0.85">mittel</option><option value="1">normal</option></select>
-      <span class="muted" id="songBpm"></span>
     </div>
     <div class="song-now" id="songNow">
       <div><div class="song-chord" id="songChord">–</div><div class="muted" id="songNext"></div></div>
@@ -904,19 +895,8 @@ function openTuner() {
   keepAwake();
 }
 
-// ---------- Songs: Akkorde im Takt, mit Einzählen, Metronom, Anschlagmuster und Prüfung pro Akkord ----------
-// chart: Takte durch | getrennt, zwei Akkorde in einem Takt teilen sich die Schläge. pattern: Achtel, D = ab, U = auf, - = Pause.
-// Nur Titel und vereinfachte Akkordfolgen (F als Fmaj7), keine Liedtexte oder Melodien.
-const SONGS = [
-  { t: "Erste Schritte", a: "Übung", bpm: 60, beats: 4, pattern: "D-D-D-D-", chart: "Em | Em | Am | Am", repeat: 3 },
-  { t: "Knockin' on Heaven's Door", a: "Bob Dylan", bpm: 68, beats: 4, pattern: "D-DU-UDU", chart: "G D | Am | G D | C", repeat: 4 },
-  { t: "Zombie", a: "The Cranberries", bpm: 84, beats: 4, pattern: "D-DU-UDU", chart: "Em | C | G | D", repeat: 4 },
-  { t: "Riptide", a: "Vance Joy", bpm: 100, beats: 4, pattern: "D-DU-UDU", chart: "Am | G | C | C", repeat: 4 },
-  { t: "Let It Be", a: "The Beatles", bpm: 72, beats: 4, pattern: "D-D-DUDU", chart: "C G | Am Fmaj7 | C G | Fmaj7 C", repeat: 4 },
-  { t: "Country Roads", a: "John Denver", bpm: 82, beats: 4, pattern: "D-DU-UDU", chart: "G | D | Em | C | G | D | C | G", repeat: 2 },
-  { t: "Bad Moon Rising", a: "Creedence Clearwater Revival", bpm: 90, beats: 4, pattern: "D-DU-UDU", chart: "D | A G | D | D | G | G | D | D | A | G | D | D", repeat: 2 },
-  { t: "House of the Rising Sun", a: "Traditional", bpm: 100, beats: 3, pattern: "D-DUDU", chart: "Am | C | D | Fmaj7 | Am | C | E | E | Am | C | D | Fmaj7 | Am | E | Am | E", repeat: 1 }
-];
+// ---------- Übung im Takt (Im-Takt-Level des Kurses): Einzählen, Metronom, Anschlagmuster, Prüfung pro Akkord ----------
+// song.chart: Takte durch | getrennt, zwei Akkorde in einem Takt teilen sich die Schläge. pattern: Achtel, D = ab, U = auf, - = Pause.
 
 // Ablauf in Schlägen: Abschnitte (ein Akkord bis zum nächsten Wechsel, je eine Prüfung) und Takte für die Anzeige
 function songPlan(s) {
@@ -939,14 +919,11 @@ let song = null;
 const songsOpen = () => $("songs").open;
 function songShow(plan, k) { $("songChord").textContent = plan.segs[k].c.n; drawDiagram(plan.segs[k].c, $("songDiagram")); }
 
-// Song oder Kurs-Übung samt Tempofaktor; Übungen laufen immer in ihrem eigenen Tempo
-let songLevel = null;
-const songSrc = () => songLevel ? [songLevel.song, 1] : [SONGS[$("songSel").value], +$("songTempo").value];
+let songLevel = null; // das Im-Takt-Level, dessen Übung gerade offen ist
 
 function songSetup() {
   stopSong();
-  const [s, tempo] = songSrc(), plan = songPlan(s), el = tag => document.createElement(tag);
-  $("songBpm").textContent = `${Math.round(s.bpm * tempo)} Schläge pro Minute`;
+  const s = songLevel.song, plan = songPlan(s), el = tag => document.createElement(tag);
   $("songPattern").style.setProperty("--slots", s.pattern.length);
   $("songPattern").setAttribute("aria-label", "Anschlag: " + [...s.pattern].map(p => p === "D" ? "ab" : p === "U" ? "auf" : "Pause").join(", "));
   $("songPattern").replaceChildren(...[...s.pattern].map((p, i) => {
@@ -960,16 +937,16 @@ function songSetup() {
     return d;
   }));
   songShow(plan, 0);
-  $("songNext").textContent = `${plan.bars.length} Takte, ${s.beats} Schläge pro Takt`;
+  $("songNext").textContent = `${plan.bars.length} Takte, ${s.bpm} Schläge pro Minute`;
   say($("songStatus"), "Tippe auf Vorspielen zum Anhören oder auf Mitspielen. Vorher wird ein Takt eingezählt."
-    + (songLevel ? " Ziel: mindestens 80 % der Akkorde sauber und rechtzeitig." : ""));
+    + " Ziel: mindestens 80 % der Akkorde sauber und rechtzeitig.");
 }
 
 async function startSong(demo) {
   stopSong();
   audio(); // noch im Tipp starten, sonst bleibt der Ton auf iPhone/iPad stumm
-  const [s, tempo] = songSrc();
-  const me = song = { s, plan: songPlan(s), spb: 60 / (s.bpm * tempo), demo, mic: !demo, t0: 0, slot: 0, seg: -1, hist: null, frames: 0, results: [], why: [], ticks: [], voices: [], ui: {} };
+  const s = songLevel.song;
+  const me = song = { s, plan: songPlan(s), spb: 60 / s.bpm, demo, mic: !demo, t0: 0, slot: 0, seg: -1, hist: null, frames: 0, results: [], why: [], ticks: [], voices: [], ui: {} };
   $("songChart").querySelectorAll("span").forEach(x => x.className = "");
   [...$("songChart").children].forEach(x => x.classList.remove("now"));
   songShow(me.plan, 0);
@@ -1065,19 +1042,17 @@ function finishSong() {
   const me = song;
   if (me.mic) songJudgeRest(me);
   const n = me.plan.segs.length, hits = me.results.filter(x => x === "hit").length, quiet = me.results.filter(x => x === "quiet").length;
-  const pct = Math.round(100 * hits / n), level = me.mic && songLevel;
-  const lvText = !level ? "" : pct >= 80 ? " <b>Level geschafft!</b>" : ` Für das Level brauchst du 80 %, diesmal waren es ${pct} %. Nochmal!`;
+  const pct = Math.round(100 * hits / n);
+  const lvText = pct >= 80 ? " <b>Level geschafft!</b>" : ` Für das Level brauchst du 80 %, diesmal waren es ${pct} %. Die roten Akkorde im Ablauf noch einmal üben.`;
   stopSong(me.mic
-    ? `<b>Geschafft: ${hits} von ${n} Akkorden sauber.</b>` + (quiet ? ` ${quiet} habe ich nicht gehört.` : "")
-      + (level ? lvText : hits === n ? " Stark! Probier das nächste Tempo." : " Die roten Akkorde im Ablauf noch einmal üben.")
-    : me.demo ? "<b>Das war's.</b> Jetzt du: tippe auf Mitspielen." : "<b>Geschafft!</b> Ohne Mikrofon gab es keine Prüfung.");
-  if (level) { courseRecord(level, pct >= 80, pct); say($("lvStatus"), `<b>${pct} % sauber und rechtzeitig.</b>` + lvText); }
+    ? `<b>${hits} von ${n} Akkorden sauber.</b>` + (quiet ? ` ${quiet} habe ich nicht gehört.` : "") + lvText
+    : me.demo ? "<b>Das war's.</b> Jetzt du: tippe auf Mitspielen." : "<b>Fertig.</b> Ohne Mikrofon gab es keine Prüfung, das Level zählt nicht.");
+  if (me.mic) { courseRecord(songLevel, pct >= 80, pct); say($("lvStatus"), `<b>${pct} % sauber und rechtzeitig.</b>` + lvText); }
 }
 function openSongs(level) {
   if (running) setRunning(false);
-  songLevel = level || null;
-  $("songPick").hidden = $("songTempoRow").hidden = !!songLevel;
-  $("songsTitle").textContent = songLevel ? songLevel.t : "Songs";
+  songLevel = level;
+  $("songsTitle").textContent = level.t;
   $("songs").showModal();
   songSetup();
   keepAwake();
@@ -1306,13 +1281,10 @@ $("lvSkip").onclick = () => { // Ausweg, falls die Erkennung bei einem Level mit
   renderCourse();
   showLevel(lvIdx + 1);
 };
-$("songsBtn").onclick = () => openSongs();
 $("songsClose").onclick = () => $("songs").close();
 $("songs").addEventListener("close", () => stopSong()); // auch bei Escape
-$("songSel").onchange = $("songTempo").onchange = songSetup;
 $("songPlay").onclick = () => song && !song.demo ? stopSong("Gestoppt.") : startSong(false);
 $("songDemo").onclick = () => song && song.demo ? stopSong("Gestoppt.") : startSong(true);
-SONGS.forEach((s, i) => $("songSel").append(new Option(`${s.t} – ${s.a}`, i)));
 $("tunerBtn").onclick = openTuner;
 $("tunerClose").onclick = () => $("tuner").close();
 $("tuner").addEventListener("close", () => { // auch bei Escape; verspätet nach Wiederöffnen: nichts tun
